@@ -1,0 +1,65 @@
+Enum.map(parse_result, fn {k, v} ->
+[_, type] = String.split(k, "_")
+{k, put_in(v, [Access.key("type", %{}), k], type)}
+end)
+Enum.flat_map(parse_result, fn {k, v} ->
+[_, type] = String.split(k, "_")
+{k , Map.put(v, "type", type)}
+end)
+
+Enum.each(keys, fn(v) ->
+
+Enum.each(keys, fn(k) ->
+  Map.put(parse_result[k], "title", "PIPPO")
+  Agent.
+end)
+
+defmodule Prova do
+	def update_map(parse_result) do
+	  inner_update_map(parse_result, Enum.count(parse_result)-1)
+	end
+
+	defp inner_update_map(state, 0) do
+	  state
+	end
+
+	defp inner_update_map(state, n_section) do
+	  {k, v} = Enum.at(state, n_section)
+	  [_, type] = String.split(k, "_")
+	  new_kv=put_in(state[k],  [Access.key("type", %{})], type)
+	  inner_update_map(Map.put(state, k, new_kv), n_section-1)
+	end
+end
+
+for elem <- parse_result, into: %{} do
+  {k, v}=elem
+  [_, type] = String.split(k, "_")
+  Map.put(parse_result[k], "type",type)
+end
+
+
+
+"024_yolo" => %{
+    "anchors" => "10,14,  23,27,  37,58,  81,82,  135,169,  344,319",
+    "classes" => "80",
+    "ignore_thresh" => ".7",
+    "jitter" => ".3",
+    "mask" => "0,1,2",
+    "num" => "6",
+    "random" => "1",
+    "truth_thresh" => "1"
+  }
+
+
+{"024_yolo",
+   %{
+     "anchors" => "10,14,  23,27,  37,58,  81,82,  135,169,  344,319",
+     "classes" => "80",
+     "ignore_thresh" => ".7",
+     "jitter" => ".3",
+     "mask" => "0,1,2",
+     "num" => "6",
+     "random" => "1",
+     "truth_thresh" => "1",
+     "type" => "yolo"
+   }}

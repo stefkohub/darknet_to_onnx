@@ -1,0 +1,218 @@
+defmodule DarknetToOnnx.GraphBuilderONNX do
+  @moduledoc """
+      Class for creating an ONNX graph from a previously generated list of layer dictionaries.
+  """
+
+  use Agent
+  require Logger
+
+  @doc """
+        Initialize with all DarkNet default parameters used creating
+        YOLO, and specify the output tensors as an OrderedDict for their
+        output dimensions with their names as keys.
+        Keyword argument:
+        output_tensors -- the output tensors as an OrderedDict containing the keys'
+        output dimensions
+  """
+  def start_link(opts) do
+    initial_state=%{
+            model_name: Keyword.fetch!(opts, :model_name) ,
+        output_tensors: Keyword.fetch!(opts, :output_tensors),
+                 nodes: [],
+             graph_def: nil,
+          input_tensor: nil,
+            epsilon_nb: 1.0e-5,
+           momentum_bn: 0.99,
+           alpha_lrelu: 0.1,
+            param_dict: %{},
+      major_node_specs: [],
+             batch_size: Keyword.fetch!(opts, :batch_size),
+            route_spec: 0
+    }
+    Agent.start_link(fn -> initial_state end, name: __MODULE__)
+  end
+
+  @doc """
+        Create an ONNX input tensor from a 'net' layer and store the batch size.
+        Keyword arguments:
+        layer_name -- the layer's name (also the corresponding key in layer_configs)
+        layer_dict -- a layer parameter dictionary (one element of layer_configs)
+  """
+
+  def make_input_tensor(state, layer_name, layer_dict) do
+    channels = String.to_integer(layer_dict["channels"])
+    height = String.to_integer(layer_dict["height"])
+    width = String.to_integer(layer_dict["width"])
+    IO.puts("Nx.tensor("<>inspect([state.batch_size, channels, height, width])<>" names: "<>layer_name<>")")
+    input_tensor = Nx.tensor(
+      [state.batch_size, channels, height, width], 
+      names: [String.to_atom(layer_name)], 
+      type: {:f, 64})
+    #input_tensor = helper.make_tensor_value_info(
+    #  layer_name, TensorProto.FLOAT, [
+    #            self.batch_size, channels, height, width])
+    state = %{state|input_tensor: input_tensor}
+    [state, layer_name, channels]
+  end
+
+
+  @doc """
+    mah...
+  """
+  def majorNodeSpecs(name, channels) do
+    %{               :name => name, 
+                 :channels => channels, 
+        :created_onnx_node => if (name != nil and is_integer(channels) and channels>0) do True else False end
+    }
+  end
+
+  @doc """
+    Get a previously ONNX node.
+    Target index can be passed for jumping to a specific index.
+    Keyword arguments:
+    target_index -- optional for jumping to a specific index,
+                    default: 0 for the previous element, while
+                    taking 'route' spec into account
+  """
+  def get_previous_node_specs(state, target_index \\ 0) do
+    if target_index == 0 do
+      if state.route_spec != 0 do
+        #TODO: assert 'dummy' not in previous_node.name
+        [%{state | route_spec: 0}, Enum.take(state.major_node_specs,state.route_specs)]
+      else
+        [state, Enum.take(state.major_node_specs, -1)]
+      end
+    else
+      [state, Enum.take(state.major_node_specs,target_index)]
+    end
+    #TODO: assert previous_node.created_onnx_node
+end
+
+  @doc """
+        Create an ONNX Conv node with optional batch normalization and
+        activation nodes.
+        Keyword arguments:
+        layer_name -- the layer's name (also the corresponding key in layer_configs)
+        layer_dict -- a layer parameter dictionary (one element of layer_configs)
+  """
+  def make_conv_node(state, layer_name, layer_dict) do
+    [state, [previous_node_specs]] = get_previous_node_specs(state)
+    IO.puts "Adesso [state, previous_node_specs, layer_dict]= "<> inspect([state, previous_node_specs, layer_dict])
+    inputs = [previous_node.specs.name]
+    kernel_shape = [String.to_integer(layer_dict["size"]), String.to_integer(layer_dict["size"])]
+    weights_shape = [String.to_integer(layer_dict["filters"]), previous_node_specs.channels] 
+    conv_params_state = DarknetToOnnx.ConvParams.start_link([
+      node_name: layer_name, 
+      batch_normalize: if layer_dict["batch_normalize"]>0 do True else False end,
+      conv_weight_dims: weights_shape
+    ])
+    strides = [String.to_integer(layer_dict["stride"]), String.to_integer(layer_dict["stride"])]
+    dilations = [1, 1]
+    weights_name = DarknetToOnnx.ConvParams.generate_param_name(conv_params_state, "conv", "weights")
+    inputs = inputs ++ weights_name
+    
+  end
+
+  def make_maxpool_node(state, layer_name, layer_dict) do
+    [ "maxpool", 1 ]
+  end
+
+  def make_shortcut_node(state, layer_name, layer_dict) do
+    ["shortcut", 2 ]
+  end
+
+  def make_route_node(state, layer_name, layer_dict) do
+    ["route", 3]
+  end
+
+  def make_upsample_node(state, layer_name, layer_dict) do
+    ["upsample", 4]
+  end
+
+  def make_yolo_node(state, layer_name, layer_dict) do
+    ["yolo", 5]
+  end
+
+  @doc """
+        Take in a layer parameter dictionary, choose the correct function for
+        creating an ONNX node and store the information important to graph creation
+        as a MajorNodeSpec object.
+        Keyword arguments:
+        layer_name -- the layer's name (also the corresponding key in layer_configs)
+        layer_dict -- a layer parameter dictionary (one element of layer_configs)
+  """
+  def make_onnx_node(state, layer_name, layer_dict) do
+    layer_type = layer_dict["type"]
+    IO.puts "layer_name= "<>inspect(layer_name) <>" layer_dict= "<>inspect(layer_dict) <> "layer_type= "<>inspect(layer_type)
+    major_node_specs = %{}
+    major_node_output_name = ""
+    major_node_output_channels = 0
+    [state, major_node_specs ] = if state.input_tensor == nil do
+      if layer_type == "net" do
+        [state, major_node_output_name, major_node_output_channels] = make_input_tensor(
+                    state, layer_name, layer_dict)
+        major_node_specs = majorNodeSpecs(major_node_output_name,
+                                          major_node_output_channels)
+        [state, major_node_specs]
+      else
+        raise "First node must be type net"
+      end
+    else
+      node_creators = %{
+        "convolutional" => &make_conv_node/3,
+              "maxpool" => &make_maxpool_node/3,
+             "shortcut" => &make_shortcut_node/3,
+                "route" => &make_route_node/3,
+             "upsample" => &make_upsample_node/3,
+                 "yolo" => &make_yolo_node/3
+      }
+      major_node_specs = if layer_type in Map.keys(node_creators) do
+        [ major_node_output_name, major_node_output_channels ] = 
+              node_creators[layer_type].(state, layer_name, layer_dict)
+        majorNodeSpecs(major_node_output_name, major_node_output_channels)
+      else
+        raise "Layer of type "<>layer_type<>" not supported"
+      end
+      [state, major_node_specs]
+    end
+    IO.puts "make_onnx_node: "<>inspect([state, major_node_output_name, major_node_output_channels])
+    [state, major_node_specs]
+  end
+
+  @doc """
+        Iterate over all layer configs (parsed from the DarkNet
+        representation of YOLO), create an ONNX graph, populate it with
+        weights from the weights file and return the graph definition.
+        Keyword arguments:
+        layer_configs -- an OrderedDict object with all parsed layers' configurations
+        weights_file_path -- location of the weights file
+        verbose -- toggles if the graph is printed after creation (default: True)
+  """
+  defp inner_create_major_node_specs(state, _layer_configs, []) do
+    state
+  end
+
+  defp inner_create_major_node_specs(state, layer_configs, acc) do
+    layer_name = hd(acc)
+    layer_dict = layer_configs[layer_name]
+    [state, major_node_specs] = make_onnx_node(state, layer_name, layer_dict)
+    IO.puts "inner_create_major_node_specs 1: [state, major_node_specs]"<>inspect([state, major_node_specs])
+    state = try do
+      # state = if major_node_specs != nil and major_node_specs.name != nil do
+      IO.puts "DENTRO IL TRY: "<>inspect(major_node_specs)
+      %{state | major_node_specs: state.major_node_specs ++ [major_node_specs]}
+    rescue
+      e in RuntimeError -> e
+    end
+    # TODO: Remove dummy "route" and "yolo" nodes
+    IO.puts "QUANDO ARRIVO QUI MAJOR [state, major_node_specs]= "<>inspect([state, major_node_specs])
+    inner_create_major_node_specs(state, layer_configs, tl(acc))
+  end
+
+  def build_onnx_graph(state, layer_configs, weights_file_path, verbose \\ True) do
+    # Enum.each(layer_configs, fn({layer_name, layer_dict}) -> 
+    state = %{state | major_node_specs: inner_create_major_node_specs(state, layer_configs, Map.keys(layer_configs))}
+    #end)
+  end
+
+end

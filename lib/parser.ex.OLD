@@ -1,0 +1,78 @@
+defmodule DarknetToOnnx.ParseDarknet do
+  @moduledoc """
+  The Darknet parser (from: https://github.com/jkjung-avt/tensorrt_demos/blob/master/yolo/yolo_to_onnx.py)
+  """
+
+  use Agent
+
+  defstruct supported_layers: [],
+               layer_counter: 0,
+               layer_configs: []
+
+  alias __MODULE__
+
+  @doc """
+        Initializes a DarkNetParser object.
+        Keyword argument:
+        supported_layers -- a string list of supported layers in DarkNet naming convention,
+        parameters are only added to the class dictionary if a parsed layer is included.
+  """
+  def start_link(opts, args \\ [
+      'net',
+      'convolutional',
+      'maxpool',
+      'shortcut',
+      'route',
+      'upsample',
+      'yolo'
+  ]) do
+    cfg_file_path = Keyword.fetch!(opts, :cfg_file_path)
+    Agent.start_link(fn -> parse_cfg_file(cfg_file_path, []) end)
+  end
+
+  @doc """
+    Takes the yolov?.cfg file and parses it layer by layer,
+        appending each layer's parameters as a dictionary to layer_configs.
+        Keyword argument:
+        cfg_file_path
+  """
+  def parse_cfg_file(cfg_file_path, state) do
+    file_stream = File.stream!(cfg_file_path, [], :line)
+    Enum.each(file_stream, fn(remainder) ->
+      <<one, _x::binary>> = remainder
+      [ layer_dict, layer_name, remainder ] = next_layer(one, remainder)
+      if layer_dict != nil do
+        Keyword.put(state.layer_configs, layer_name, layer_dict)
+      end
+    end)
+  end
+
+  @doc """
+    Takes in a string and segments it by looking for DarkNet delimiters.
+        Returns the layer parameters and the remaining string after the last delimiter.
+        Example for the first Conv layer in yolo.cfg ...
+        [convolutional]
+        batch_normalize=1
+        filters=32
+        size=3
+        stride=1
+        pad=1
+        activation=leaky
+        ... becomes the following layer_dict return value:
+        {'activation': 'leaky', 'stride': 1, 'pad': 1, 'filters': 32,
+        'batch_normalize': 1, 'type': 'convolutional', 'size': 3}.
+        '001_convolutional' is returned as layer_name, and all lines that follow in yolo.cfg
+        are returned as the next remainder.
+        Keyword argument:
+        remainder -- a string with all raw text after the previously parsed layer
+  """
+  def next_layer(one, remainder) when one == 35 do
+    [nil, nil, nil]
+  end
+
+  def next_layer(remainder) do
+    [opening, remainder] = String.split(remainder, "[")
+    [closing, remainder] = String.split(opening, "]")
+  end
+
+end

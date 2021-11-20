@@ -1,43 +1,35 @@
-defmodule ElixirStartingPoint.MixProject do
+defmodule DarknetToOnnx.MixProject do
   use Mix.Project
 
   def project do
     [
-      app: :elixir_starting_point,
+      app: :darknet_to_onnx,
       version: "0.1.0",
-      build_path: "_build",
-      deps_path: "deps",
-      lockfile: "mix.lock",
       elixir: "~> 1.12",
-      consolidate_protocols: Mix.env() != :test,
-      deps: deps(),
-      test_coverage: [tool: ExCoveralls],
-      preferred_cli_env: [
-        coveralls: :test,
-        "coveralls.detail": :test,
-        "coveralls.html": :test
-      ],
-      dialyzer: [
-        plt_add_apps: [:elixir, :mix],
-        flags: [
-          :error_handling,
-          :race_conditions,
-          :underspecs
-        ],
-        ignore_warnings: ".dialyzer_ignore.exs"
-      ]
+      start_permanent: Mix.env() == :prod,
+      deps: deps()
     ]
   end
 
+  # Run "mix help compile.app" to learn about applications.
   def application do
-    []
+    [
+      extra_applications: [:logger]
+    ]
   end
 
+  # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:credo, "~> 1.6.1", only: [:dev, :test], runtime: false},
-      {:dialyxir, "~> 1.1", only: [:dev, :test], runtime: false},
-      {:excoveralls, "~> 0.14", only: [:dev, :test], runtime: false}
+      # {:dep_from_hexpm, "~> 0.3.0"},
+      # {:dep_from_git, git: "https://github.com/elixir-lang/my_dep.git", tag: "0.1.0"}
+      # VEDIAMO: {:explorer, "~> 0.1.0-dev", github: "elixir-nx/explorer"},
+      {:configparser_ex, git: "https://github.com/easco/configparser_ex", tag: "master"},
+      {:axon, "~> 0.1.0-dev", github: "elixir-nx/axon"},
+      {:axon_onnx, git: "https://github.com/elixir-nx/axon_onnx", tag: "master"},
+      {:exla, "~> 0.1.0-dev", github: "elixir-nx/nx", sparse: "exla"},
+      {:torchx, "~> 0.1.0-dev", github: "elixir-nx/nx", sparse: "torchx"},
+      {:nx, "~> 0.1.0-dev", github: "elixir-nx/nx", sparse: "nx", override: true}
     ]
   end
 end
