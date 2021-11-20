@@ -179,13 +179,13 @@ defmodule DarknetToOnnx.ParseDarknet do
   def get_category_num(state) do
     values = get_in(Map.values(state.parse_result), [Access.all(), "classes"])
     [cn] = Enum.uniq(Enum.filter(values, fn x -> x != nil end))
-    String.to_integer(cn)
+    cn
   end
 
   @doc """
   Find input height and width of the yolo model from layer configs.
   """
   def get_h_and_w(state) do
-    [String.to_integer(state.parse_result["000_net"]["height"]), String.to_integer(state.parse_result["000_net"]["width"])]
+    [state.parse_result["000_net"]["height"], state.parse_result["000_net"]["width"]]
   end
 end

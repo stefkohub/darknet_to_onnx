@@ -5,9 +5,15 @@ defmodule DarknetToOnnx do
 
   @max_batch_size 1
   @model "yolov3-tiny"
+  @weights_file_path "../yolov3-tiny.cfg"
 
   def main() do
-    {:ok, parser_pid} = DarknetToOnnx.ParseDarknet.start_link([cfg_file_path: "../yolov3-tiny.cfg"], [])
+    {result, parser_pid} = DarknetToOnnx.ParseDarknet.start_link([cfg_file_path: "../yolov3-tiny.cfg"], [])
+    if result != :ok do
+      {_msg_already_started, old_pid} = parser_pid
+      Agent.stop(old_pid)
+      {:ok, parser_pid} = DarknetToOnnx.ParseDarknet.start_link([cfg_file_path: "../yolov3-tiny.cfg"], [])
+    end
 
     parser_state = DarknetToOnnx.ParseDarknet.get_state()
     layer_configs = parser_state.parse_result
@@ -27,14 +33,22 @@ defmodule DarknetToOnnx do
       output_tensor_shapes = Enum.reverse(output_tensor_shapes)
     end
 
-    output_tensor_dims = Enum.zip(output_tensor_names, output_tensor_shapes)
+    output_tensor_dims = Map.new(Enum.zip(output_tensor_names, output_tensor_shapes))
 
     IO.puts("Building ONNX graph...")
-    # builder = DarknetToOnnx.GraphBuilderONNX(
-    #  @model, output_tensor_dims, @max_batch_size)
-    # yolo_model_def = builder.build_onnx_graph(
-    #    layer_configs=layer_configs,
-    #    weights_file_path=weights_file_path,
-    #    verbose=True)
+    {result, gb_pid} = DarknetToOnnx.GraphBuilderONNX.start_link([model_name: @model, output_tensors: output_tensor_dims, batch_size: @max_batch_size])
+    if result != :ok do
+      {_msg_already_started, old_pid} = gb_pid
+      Agent.stop(old_pid)
+      {:ok, gb_pid} = DarknetToOnnx.GraphBuilderONNX.start_link([model_name: @model, output_tensors: output_tensor_dims, batch_size: @max_batch_size])
+    end
+
+    builder = DarknetToOnnx.GraphBuilderONNX.get_state(gb_pid)
+    IO.puts "qui builder="<>inspect(builder)
+     yolo_model_def = DarknetToOnnx.GraphBuilderONNX.build_onnx_graph(
+        builder,
+        layer_configs,
+        weights_file_path=@weights_file_path,
+        verbose=True)
   end
 end

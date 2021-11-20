@@ -21,4 +21,8 @@ defmodule DarknetToOnnx.Learning do
   def update_map_adding_type(parse_result) do
     update_map(parse_result, &add_type_key/3)
   end
+
+  def cfl(srclist, newarray) do
+    Enum.concat([srclist], [newarray])|>List.flatten()
+  end
 end
