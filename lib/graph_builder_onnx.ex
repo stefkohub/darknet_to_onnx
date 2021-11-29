@@ -63,15 +63,20 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
     height = layer_dict["height"]
     width = layer_dict["width"]
 
-    #input_tensor =
+    # input_tensor =
     #  Nx.tensor(
     #    [state.batch_size, channels, height, width],
     #    names: [String.to_atom(layer_name)],
     #    type: {:f, 64}
     #  )
 
-    input_tensor = Helper.make_tensor_value_info(
-      layer_name, {:f, 32}, [state.batch_size, channels, height, width])
+    input_tensor =
+      Helper.make_tensor_value_info(
+        layer_name,
+        {:f, 32},
+        [state.batch_size, channels, height, width]
+      )
+
     state = %{state | input_tensor: input_tensor}
     [state, layer_name, channels]
   end
@@ -621,18 +626,22 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
     Enum.map(Map.keys(state.param_dict), fn layer_name ->
       [_, layer_type] = String.split(layer_name, "_")
       params = state.param_dict[layer_name]
+
       case layer_type do
-      "convolutional" ->
-        [initializer_layer, inputs_layer] = DarknetToOnnx.WeightLoader.load_conv_weights(params)
-      "upsample" ->
-        [[],[]]
-        [initializer_layer, inputs_layer] = DarknetToOnnx.WeightLoader.load_upsample_scales(params)
-      true ->
-        raise "Unexpected layer_name"
+        "convolutional" ->
+          [initializer_layer, inputs_layer] = DarknetToOnnx.WeightLoader.load_conv_weights(params)
+
+        "upsample" ->
+          [[], []]
+          [initializer_layer, inputs_layer] = DarknetToOnnx.WeightLoader.load_upsample_scales(params)
+
+        true ->
+          raise "Unexpected layer_name"
       end
-    end)|> Enum.reduce([[],[]], fn value, acc ->
+    end)
+    |> Enum.reduce([[], []], fn value, acc ->
       [newv, newi] = value
-      [val, inp]=acc
+      [val, inp] = acc
       [Utils.cfl(val, newv), Utils.cfl(inp, newi)]
     end)
   end
@@ -648,12 +657,19 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
 
     weight_loader = DarknetToOnnx.WeightLoader.start_link(weights_file: weights_file_path)
     [initializer, inputs] = make_initializer_inputs(state)
-    DarknetToOnnx.WeightLoader.stop_link()   
-    state = %{state | graph_def: Helper.make_graph(state.nodes, 
-      state.model_name, 
-      Utils.cfl(state.input_tensor, inputs),
-      outputs,
-      initializer)}
+    DarknetToOnnx.WeightLoader.stop_link()
+
+    state = %{
+      state
+      | graph_def:
+          Helper.make_graph(
+            state.nodes,
+            state.model_name,
+            Utils.cfl(state.input_tensor, inputs),
+            outputs,
+            initializer
+          )
+    }
 
     # DEVO TOGLIERLO NON DEVE TORNARE STATE !!!!!!!! ##################
     state

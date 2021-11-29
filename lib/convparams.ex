@@ -36,9 +36,9 @@ defmodule DarknetToOnnx.ConvParams do
         Generates a name based on two string inputs,
         and checks if the combination is valid.
   """
-  def generate_param_name(node_name, param_category, suffix) 
-      when param_category in ["bn", "conv"] and suffix in ["scale", "mean", "var", "weights", "bias"] 
-            and is_binary(node_name) do
+  def generate_param_name(node_name, param_category, suffix)
+      when param_category in ["bn", "conv"] and suffix in ["scale", "mean", "var", "weights", "bias"] and
+             is_binary(node_name) do
     generate_param_name(get_state(node_name), param_category, suffix)
   end
 

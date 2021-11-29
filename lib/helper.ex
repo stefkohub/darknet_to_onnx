@@ -27,16 +27,18 @@ defmodule DarknetToOnnx.Helper do
   """
   def make_tensor(name, data_type, dims, vals, raw \\ False) do
     # TODO: add a zillion of checks on sizes and so on...
-    expected_size = Enum.reduce(Tuple.to_list(dims), 1, fn val, acc -> acc*val end)
+    expected_size = Enum.reduce(Tuple.to_list(dims), 1, fn val, acc -> acc * val end)
     # TODO add support for complex and float 16 values...
-    IO.puts("DENTRO MAKE_TENSOR HO: "<>inspect([name, data_type, dims, vals, raw]))
+    IO.puts("DENTRO MAKE_TENSOR HO: " <> inspect([name, data_type, dims, vals, raw]))
+
     tensor = %TensorProto{
       data_type: data_type,
-      raw_data: raw && vals || "",
+      raw_data: (raw && vals) || "",
       float_data: vals,
       dims: dims
     }
-    IO.puts("DENTRO MAKE_TENSOR tensor= "<>inspect(tensor))
+
+    IO.puts("DENTRO MAKE_TENSOR tensor= " <> inspect(tensor))
     tensor
   end
 
@@ -78,8 +80,11 @@ defmodule DarknetToOnnx.Helper do
   end
 
   defp create_dimensions(shape, shape_denotation) do
-    list_shape = is_tuple(shape) && Tuple.to_list(shape) || shape
-    Enum.reduce(list_shape |> Enum.with_index(), [], fn {value, index}, acc -> create_dimensions_reduce(shape_denotation, value, index, acc) end)
+    list_shape = (is_tuple(shape) && Tuple.to_list(shape)) || shape
+
+    Enum.reduce(list_shape |> Enum.with_index(), [], fn {value, index}, acc ->
+      create_dimensions_reduce(shape_denotation, value, index, acc)
+    end)
   end
 
   defp create_dimensions_reduce(shape_denotation, value, index, acc) do
