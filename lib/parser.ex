@@ -45,7 +45,7 @@ defmodule DarknetToOnnx.ParseDarknet do
     # [param_type, param_value_raw] = param |> String.replace(~r/\s+/, "")|>String.split("=")
     {param_type, param_value_raw} = params
     param_value_raw = param_value_raw |> String.replace(~r/\s+/, "")
-    IO.puts("Analizzo params: " <> inspect([params, param_type, param_value_raw]))
+    #IO.puts("Analizzo params: " <> inspect([params, param_type, param_value_raw]))
 
     cond do
       skip_params != nil and param_type in skip_params ->
@@ -93,10 +93,10 @@ defmodule DarknetToOnnx.ParseDarknet do
     parse_result =
       DarknetToOnnx.Learning.update_map(parse_result, fn state, k, v ->
         # [_ptype, pvalue]=parse_params(state, state[k])
-        IO.puts("STATE K=" <> inspect(state[k]))
+        #IO.puts("STATE K=" <> inspect(state[k]))
 
         Enum.map(state[k], fn {k, v} ->
-          IO.puts("CHIAMO parse_param CON: " <> inspect({k, v}))
+          #IO.puts("CHIAMO parse_param CON: " <> inspect({k, v}))
           [_ptype, pvalue] = parse_params({k, v})
           {k, pvalue}
         end)
@@ -104,7 +104,7 @@ defmodule DarknetToOnnx.ParseDarknet do
       end)
 
     parse_result = DarknetToOnnx.Learning.update_map_adding_type(parse_result)
-    IO.puts("Qui parse_result=" <> inspect(parse_result))
+    #IO.puts("Qui parse_result=" <> inspect(parse_result))
     %{state | :parse_result => parse_result, :keys => keys}
   end
 

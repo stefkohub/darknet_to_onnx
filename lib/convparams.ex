@@ -28,10 +28,20 @@ defmodule DarknetToOnnx.ConvParams do
     initial_state
   end
 
+  def get_state(node_name) do
+    Agent.get(String.to_atom(node_name), fn state -> state end)
+  end
+
   @doc """
         Generates a name based on two string inputs,
         and checks if the combination is valid.
   """
+  def generate_param_name(node_name, param_category, suffix) 
+      when param_category in ["bn", "conv"] and suffix in ["scale", "mean", "var", "weights", "bias"] 
+            and is_binary(node_name) do
+    generate_param_name(get_state(node_name), param_category, suffix)
+  end
+
   def generate_param_name(state, param_category, suffix)
       when param_category in ["bn", "conv"] and suffix in ["scale", "mean", "var", "weights", "bias"] do
     # TODO (considering use of fetch! in start_link)
@@ -44,12 +54,5 @@ defmodule DarknetToOnnx.ConvParams do
     end
 
     state.node_name <> "_" <> param_category <> "_" <> suffix
-    # if param_category == 'bn':
-    #    assert self.batch_normalize
-    #    assert suffix in ['scale', 'bias', 'mean', 'var']
-    # elif param_category == 'conv':
-    #    assert suffix in ['weights', 'bias']
-    #    if suffix == 'bias':
-    #        assert not self.batch_normalize
   end
 end

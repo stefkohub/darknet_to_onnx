@@ -6,8 +6,8 @@ defmodule DarknetToOnnx.ParseDarknet do
   use Agent
 
   defstruct supported_layers: [],
-               layer_counter: 0,
-               layer_configs: []
+            layer_counter: 0,
+            layer_configs: []
 
   alias __MODULE__
 
@@ -17,15 +17,18 @@ defmodule DarknetToOnnx.ParseDarknet do
         supported_layers -- a string list of supported layers in DarkNet naming convention,
         parameters are only added to the class dictionary if a parsed layer is included.
   """
-  def start_link(opts, args \\ [
-      'net',
-      'convolutional',
-      'maxpool',
-      'shortcut',
-      'route',
-      'upsample',
-      'yolo'
-  ]) do
+  def start_link(
+        opts,
+        args \\ [
+          'net',
+          'convolutional',
+          'maxpool',
+          'shortcut',
+          'route',
+          'upsample',
+          'yolo'
+        ]
+      ) do
     cfg_file_path = Keyword.fetch!(opts, :cfg_file_path)
     Agent.start_link(fn -> parse_cfg_file(cfg_file_path, []) end)
   end
@@ -38,9 +41,11 @@ defmodule DarknetToOnnx.ParseDarknet do
   """
   def parse_cfg_file(cfg_file_path, state) do
     file_stream = File.stream!(cfg_file_path, [], :line)
-    Enum.each(file_stream, fn(remainder) ->
+
+    Enum.each(file_stream, fn remainder ->
       <<one, _x::binary>> = remainder
-      [ layer_dict, layer_name, remainder ] = next_layer(one, remainder)
+      [layer_dict, layer_name, remainder] = next_layer(one, remainder)
+
       if layer_dict != nil do
         Keyword.put(state.layer_configs, layer_name, layer_dict)
       end
@@ -74,5 +79,4 @@ defmodule DarknetToOnnx.ParseDarknet do
     [opening, remainder] = String.split(remainder, "[")
     [closing, remainder] = String.split(opening, "]")
   end
-
 end

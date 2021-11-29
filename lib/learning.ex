@@ -22,7 +22,12 @@ defmodule DarknetToOnnx.Learning do
     update_map(parse_result, &add_type_key/3)
   end
 
+  @doc """
+       Concatenate and flatten
+       Returns a list obtained from the concatenation of the two input lists.
+       The result is then flattened so the result is a plain list.
+  """
   def cfl(srclist, newarray) do
-    Enum.concat([srclist], [newarray])|>List.flatten()
+    Enum.concat([srclist], [newarray]) |> List.flatten()
   end
 end

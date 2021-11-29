@@ -14,16 +14,25 @@ defmodule DarknetToOnnx.UpsampleParams do
   def start_link(opts) do
     initial_state = %{
       node_name: Keyword.fetch!(opts, :node_name),
-      value: Keyword.fetch!(opts, :value),
+      value: Keyword.fetch!(opts, :value)
     }
+
     Agent.start_link(fn -> initial_state end, name: String.to_atom(initial_state.node_name))
     initial_state
+  end
+
+  def get_state(node_name) do
+    Agent.get(String.to_atom(node_name), fn state -> state end)
   end
 
   @doc """
         Generates the scale parameter name for the Upsample node.
   """
-  def generate_param_name(state) do
+  def generate_param_name(name) when is_binary(name) do
+    generate_param_name(get_state(name))
+  end
+
+  def generate_param_name(state) when is_map(state) do
     state.node_name <> "_" <> "scale"
   end
 end
