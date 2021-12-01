@@ -4,16 +4,20 @@ defmodule DarknetToOnnx do
   """
 
   @max_batch_size 1
-  @model "yolov3-tiny"
-  @weights_file_path "../yolov3-tiny.weights"
+  @model "yolov3-tiny-416"
+  @weights_file_path "../yolov3-tiny-416.weights"
+  @cfg_file_path "../yolov3-tiny-416.cfg"
+  @output_path "yolov3-tiny-416.onnx"
+
+  alias DarknetToOnnx.Helper, as: Helper
 
   def main() do
-    {result, parser_pid} = DarknetToOnnx.ParseDarknet.start_link([cfg_file_path: "../yolov3-tiny.cfg"], [])
+    {result, parser_pid} = DarknetToOnnx.ParseDarknet.start_link([cfg_file_path: @cfg_file_path], [])
 
     if result != :ok do
       {_msg_already_started, old_pid} = parser_pid
       Agent.stop(old_pid)
-      {:ok, parser_pid} = DarknetToOnnx.ParseDarknet.start_link([cfg_file_path: "../yolov3-tiny.cfg"], [])
+      {:ok, parser_pid} = DarknetToOnnx.ParseDarknet.start_link([cfg_file_path: @cfg_file_path], [])
     end
 
     parser_state = DarknetToOnnx.ParseDarknet.get_state()
@@ -59,5 +63,10 @@ defmodule DarknetToOnnx do
         weights_file_path = @weights_file_path,
         verbose = True
       )
+
+    IO.puts "Saving ONNX file..."
+
+    Helper.save_model(yolo_model_def, @output_path)
+    yolo_model_def
   end
 end

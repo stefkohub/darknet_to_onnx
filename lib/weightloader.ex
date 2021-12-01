@@ -81,7 +81,8 @@ defmodule DarknetToOnnx.WeightLoader do
     param_size = Enum.reduce(Tuple.to_list(param_shape), 1, fn val, acc -> acc * val end)
     %{weights_file: weights_file} = get_state()
     # param_data = Nx.reshape(Nx.from_binary(IO.binread(weights_file, param_size*4), {:f, 32}), param_shape)
-    param_data = Nx.from_binary(IO.binread(weights_file, param_size * 4), {:f, 32})
+    # param_data = Nx.from_binary(IO.binread(weights_file, param_size * 4), {:f, 32})
+    param_data = IO.binread(weights_file, param_size * 4)
     [param_name, param_data, param_shape]
     # TODO: Vedi righe 466-470
     # Nx.reshape(Nx.from_binary(), shape)
@@ -102,20 +103,21 @@ defmodule DarknetToOnnx.WeightLoader do
     [param_name, param_data, param_data_shape] = load_one_param_type(conv_params, param_category, suffix)
 
     # Nx.reshape(param_data, name: param_name)
-    initializer_tensor = param_data
-    input_tensor = []
+    #initializer_tensor = param_data
+    #input_tensor = []
 
     initializer_tensor =
       DarknetToOnnx.Helper.make_tensor(
         param_name,
-        {:f, 32},
+        1,
         param_data_shape,
         param_data
       )
 
-    # input_tensor = helper.make_tensor_value_info(
-    #    param_name, TensorProto.FLOAT, param_data_shape)
-    # return initializer_tensor, input_tensor
+    input_tensor = Helper.make_tensor_value_info(
+      param_name, 
+      1,
+      param_data_shape)
     [initializer_tensor, input_tensor]
   end
 
@@ -163,15 +165,15 @@ defmodule DarknetToOnnx.WeightLoader do
     scale_init =
       Helper.make_tensor(
         DarknetToOnnx.UpsampleParams.generate_param_name(upsample_state),
-        {:f, 32},
+        1, #{:f, 32},
         upsample_state.value.shape,
-        upsample_state.value
+        upsample_state.value.data.state
       )
 
     scale_input =
       Helper.make_tensor_value_info(
         DarknetToOnnx.UpsampleParams.generate_param_name(upsample_state),
-        {:f, 32},
+        1, #{:f, 32},
         upsample_state.value.shape
       )
 

@@ -22,7 +22,9 @@ defmodule DarknetToOnnx.UpsampleParams do
   end
 
   def get_state(node_name) do
-    Agent.get(String.to_atom(node_name), fn state -> state end)
+    s=Agent.get(String.to_atom(node_name), fn state -> state end)
+    IO.puts "QUI PRENDO LO STATE ED HO: "<>inspect(s)
+    s
   end
 
   @doc """

@@ -8,17 +8,17 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
 
   alias DarknetToOnnx.Learning, as: Utils
   alias DarknetToOnnx.Helper, as: Helper
-  alias Onnx.ModelProto, as: Model
-  alias Onnx.GraphProto, as: Graph
-  alias Onnx.NodeProto, as: Node
-  alias Onnx.ValueInfoProto, as: Value
-  alias Onnx.AttributeProto, as: Attribute
-  alias Onnx.OperatorSetIdProto, as: Opset
-  alias Onnx.TypeProto, as: Type
+  # alias Onnx.ModelProto, as: Model
+  # alias Onnx.GraphProto, as: Graph
+  # alias Onnx.NodeProto, as: Node
+  # alias Onnx.ValueInfoProto, as: Value
+  # alias Onnx.AttributeProto, as: Attribute
+  # alias Onnx.OperatorSetIdProto, as: Opset
+  # alias Onnx.TypeProto, as: Type
   # NON MI PIACE alias Onnx.TypeProto.Tensor, as: Placeholder
-  alias Onnx.TypeProto.Tensor, as: TensorProto
-  alias Onnx.TensorShapeProto, as: Shape
-  alias Onnx.TensorShapeProto.Dimension, as: Dimension
+  # alias Onnx.TypeProto.Tensor, as: TensorProto
+  # alias Onnx.TensorShapeProto, as: Shape
+  # alias Onnx.TensorShapeProto.Dimension, as: Dimension
 
   @doc """
         Initialize with all DarkNet default parameters used creating
@@ -47,7 +47,7 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
     Agent.start_link(fn -> initial_state end, name: __MODULE__)
   end
 
-  def get_state(pid) do
+  def get_state(_pid) do
     Agent.get(__MODULE__, fn state -> state end)
   end
 
@@ -73,7 +73,7 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
     input_tensor =
       Helper.make_tensor_value_info(
         layer_name,
-        {:f, 32},
+        1, #{:f, 32},
         [state.batch_size, channels, height, width]
       )
 
@@ -126,85 +126,47 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
     # TODO: assert previous_node.created_onnx_node
   end
 
-  defp make_conv_node_batch_normalize(state, conv_params_state, layer_name_output)
+  defp make_conv_node_batch_normalize(state, inputs, conv_params_state, layer_name_output)
        when conv_params_state.batch_normalize == True do
-    %Onnx.NodeProto{
-      op_type: "BatchNormalization",
-      input:
-        [layer_name_output] ++
-          for suffix <- ["scale", "bias", "mean", "var"] do
+    inputs = Utils.cfl(inputs, for suffix <- ["scale", "bias", "mean", "var"] do
             DarknetToOnnx.ConvParams.generate_param_name(conv_params_state, "bn", suffix)
-          end,
-      output: [layer_name_output <> "_bn"],
-      name: [layer_name_output <> "_bn"],
-      attribute: %{
-        epsilon: state.epsilon_bn,
-        momentum: state.momentum_bn
-      }
-    }
+          end)
+    [ Helper.make_node("BatchNormalization",
+         inputs,
+         [layer_name_output <> "_bn"], 
+         layer_name_output <> "_bn", %{
+           epsilon: state.epsilon_bn,
+           momentum: state.momentum_bn
+        }),
+      inputs]
   end
 
-  def make_conv_node_leaky_relu(state, conv_params_state, layer_name) do
-    %Onnx.NodeProto{
-      op_type: "LeakyRelu",
-      input: [layer_name <> "_bn"],
-      output: [layer_name <> "_lrelu"],
-      name: [layer_name <> "_lrelu"],
-      attribute: %{
+  def make_conv_node_leaky_relu(state, inputs, _conv_params_state, layer_name) do
+    Helper.make_node("LeakyRelu", inputs, [layer_name <> "_lrelu"], layer_name <> "_lrelu", %{
         alpha: state.alpha_lrelu
       }
-    }
+    )
   end
 
-  def make_conv_node_mish(state, conv_params_state, layer_name) do
+  def make_conv_node_mish(_state, inputs, _conv_params_state, layer_name) do
     layer_name_softplus = layer_name <> "_softplus"
 
     [
-      %Onnx.NodeProto{
-        op_type: "Softplus",
-        input: [layer_name],
-        output: [layer_name_softplus],
-        name: [layer_name_softplus]
-      },
-      %Onnx.NodeProto{
-        op_type: "Tanh",
-        input: [layer_name_softplus],
-        output: [layer_name <> "_tanh"],
-        name: [layer_name <> "_tanh"]
-      },
-      %Onnx.NodeProto{
-        op_type: "Mul",
-        input: [layer_name],
-        output: [layer_name <> "_mish"],
-        name: [layer_name <> "_mish"]
-      }
+      Helper.make_node("Softplus",inputs,[layer_name_softplus], layer_name_softplus),
+      Helper.make_node("Tanh",[layer_name_softplus],[layer_name <> "_tanh"],layer_name <> "_tanh"),
+      Helper.make_node("Mul", inputs, [layer_name <> "_mish"], layer_name <> "_mish")
     ]
   end
 
-  def make_conv_node_swish(state, conv_params_state, layer_name) do
+  def make_conv_node_swish(_state, inputs, _conv_params_state, layer_name) do
     [
-      %Onnx.NodeProto{
-        op_type: "Sigmoid",
-        input: [layer_name],
-        output: [layer_name <> "_sigmoid"],
-        name: layer_name <> "_sigmoid"
-      },
-      %Onnx.NodeProto{
-        op_type: "Mul",
-        input: [layer_name],
-        output: [layer_name <> "_swish"],
-        name: layer_name <> "_swish"
-      }
+      Helper.make_node("Sigmoid", inputs, [layer_name <> "_sigmoid"],layer_name <> "_sigmoid"),
+      Helper.make_node("Mul",Utils.cfl(inputs, layer_name <> "_sigmoid"),[layer_name <> "_swish"],layer_name <> "_swish")
     ]
   end
 
-  def make_conv_node_logistic(state, conv_params_state, layer_name) do
-    %Onnx.NodeProto{
-      op_type: "Sigmoid",
-      input: [layer_name],
-      output: [layer_name <> "_lgx"],
-      name: layer_name <> "_lgx"
-    }
+  def make_conv_node_logistic(_state, inputs, _conv_params_state, layer_name) do
+    Helper.make_node("Sigmoid",inputs,[layer_name <> "_lgx"],layer_name <> "_lgx")
   end
 
   @doc """
@@ -247,64 +209,58 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
         Utils.cfl([], [previous_node_specs.name, weights_name])
       end
 
-    conv_node = %Onnx.NodeProto{
-      op_type: "Conv",
-      input: inputs,
-      output: [layer_name],
-      name: layer_name,
-      attribute: %{
+    conv_node = Helper.make_node("Conv", inputs, [layer_name], layer_name, %{
         kernel_shape: kernel_shape,
         strides: strides,
-        auto_pad: 'SAME_LOWER',
+        auto_pad: "SAME_LOWER",
         dilations: dilations
-      }
-    }
-
-    # IO.puts "DEVO SOMMARE"
-    # IO.puts inspect(state.nodes)
-    # IO.puts "CON"
-    # IO.puts inspect(conv_node)
+    })
     state = %{state | nodes: Utils.cfl(state.nodes, conv_node)}
     layer_name_output = layer_name
+    inputs = [layer_name]
 
-    [state, layer_name_output] =
+    [state, layer_name_output, inputs] =
       if conv_params_state.batch_normalize == True do
+        [ new_nodes, inputs ] = make_conv_node_batch_normalize(state, inputs, conv_params_state, layer_name)
         [
-          %{state | nodes: Utils.cfl(state.nodes, [make_conv_node_batch_normalize(state, conv_params_state, layer_name)])},
-          layer_name <> "_bn"
+          %{state | nodes: Utils.cfl(state.nodes, new_nodes)},
+          layer_name <> "_bn",
+          inputs
         ]
       else
-        [state, layer_name_output]
+        [state, layer_name_output, inputs]
       end
 
     [state, layer_name_output] =
       case layer_dict["activation"] do
         "leaky" ->
           [
-            %{state | nodes: Utils.cfl(state.nodes, [make_conv_node_leaky_relu(state, conv_params_state, layer_name)])},
+            %{state | nodes: Utils.cfl(state.nodes, [make_conv_node_leaky_relu(state, inputs, conv_params_state, layer_name)])},
             layer_name <> "_leaky"
           ]
 
         "mish" ->
           [
-            %{state | nodes: Utils.cfl(state.nodes, [make_conv_node_mish(state, conv_params_state, layer_name)])},
+            %{state | nodes: Utils.cfl(state.nodes, [make_conv_node_mish(state, inputs, conv_params_state, layer_name)])},
             layer_name <> "_mish"
           ]
 
         "swish" ->
           [
-            %{state | nodes: Utils.cfl(state.nodes, [make_conv_node_swish(state, conv_params_state, layer_name)])},
+            %{state | nodes: Utils.cfl(state.nodes, [make_conv_node_swish(state, inputs, conv_params_state, layer_name)])},
             layer_name <> "_swish"
           ]
 
         "logistic" ->
           [
-            %{state | nodes: Utils.cfl(state.nodes, [make_conv_node_logistic(state, conv_params_state, layer_name)])},
+            %{state | nodes: Utils.cfl(state.nodes, [make_conv_node_logistic(state, inputs, conv_params_state, layer_name)])},
             layer_name <> "_logistic"
           ]
 
-        _ ->
+        "linear" ->
           [state, layer_name_output]
+        _ ->
+          raise "Unsupported layer_dict activation type: "<>inspect(layer_dict["activation"])
       end
 
     state = %{state | param_dict: Map.merge(state.param_dict, %{layer_name => conv_params_state})}
@@ -333,17 +289,11 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
             Utils.cfl(
               state.nodes,
               [
-                %Onnx.NodeProto{
-                  op_type: "MaxPool",
-                  input: [previous_node_specs.name],
-                  output: [layer_name],
-                  name: [layer_name],
-                  attribute: %{
+                Helper.make_node("MaxPool",[previous_node_specs.name],[layer_name],layer_name,%{
                     kernel_shape: [layer_dict["size"], layer_dict["size"]],
                     auto_pad: "SAME_UPPER",
                     strides: [layer_dict["stride"], layer_dict["stride"]]
-                  }
-                }
+                  })
               ]
             )
       },
@@ -352,7 +302,7 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
     ]
   end
 
-  def make_shortcut_node(state, layer_name, layer_dict) do
+  def make_shortcut_node(state, _layer_name, _layer_dict) do
     [state, "shortcut", 2]
   end
 
@@ -365,7 +315,7 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
           hd(layer_dict["layers"])
         end
 
-      [state, route_node_specs] = get_previous_node_specs(state, target_index = index)
+      [state, route_node_specs] = get_previous_node_specs(state, index)
       groups = layer_dict["groups"]
 
       [
@@ -374,10 +324,7 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
           | nodes:
               Utils.cfl(
                 state.nodes,
-                %Onnx.NodeProto{
-                  op_type: "Split",
-                  input: [route_node_specs.name],
-                  output:
+                Helper.make_node("Split",[route_node_specs.name],
                     for nn <- 0..groups, into: [] do
                       if nn == groups do
                         layer_name
@@ -385,12 +332,11 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
                         layer_name <> "_dummy" <> Integer.to_string(nn)
                       end
                     end,
-                  name: layer_name,
-                  attribute: %{
+                  layer_name,
+                  %{
                     axis: 1,
                     split: [route_node_specs.channels] |> List.duplicate(groups) |> List.flatten()
-                  }
-                }
+                  })
               )
         },
         layer_name,
@@ -434,15 +380,7 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
         | nodes:
             Utils.cfl(
               state.nodes,
-              %Onnx.NodeProto{
-                op_type: "Concat",
-                input: inputs,
-                output: [layer_name],
-                name: layer_name,
-                attribute: %{
-                  axis: 1
-                }
-              }
+              Helper.make_node("Concat",inputs,[layer_name],layer_name,%{ axis: 1 })
             )
       },
       layer_name,
@@ -450,7 +388,7 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
     ]
   end
 
-  def inner_make_route_node_recursive(state, inputs, channels, []) do
+  def inner_make_route_node_recursive(_state, inputs, channels, []) do
     [inputs, channels]
   end
 
@@ -464,7 +402,7 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
         index
       end
 
-    [state, previous_node_specs] = get_previous_node_specs(state, target_index = index)
+    [state, previous_node_specs] = get_previous_node_specs(state, index)
     inputs = Utils.cfl(inputs, previous_node_specs.name)
     channels = channels + previous_node_specs.channels
     inner_make_route_node_recursive(state, inputs, channels, tl(layers))
@@ -494,6 +432,7 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
     ## This is converting an integer to a float
     upsample_factor = layer_dict["stride"] / 1
     scales = Nx.tensor([1.0, 1.0, upsample_factor, upsample_factor], type: {:f, 32})
+    # scales = [1.0, 1.0, upsample_factor, upsample_factor]
     [state, previous_node_specs] = get_previous_node_specs(state)
 
     if previous_node_specs.channels <= 0 do
@@ -509,15 +448,7 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
         | nodes:
             Utils.cfl(
               state.nodes,
-              %Onnx.NodeProto{
-                op_type: "Upsample",
-                input: inputs,
-                output: [layer_name],
-                name: layer_name,
-                attribute: %{
-                  mode: "nearest"
-                }
-              }
+              Helper.make_node("Upsample", inputs, [layer_name], layer_name, %{ mode: "nearest" } )
             ),
           param_dict: Map.merge(state.param_dict, %{layer_name => upsample_params})
       },
@@ -530,7 +461,7 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
         Create an ONNX Yolo node.
         These are dummy nodes which would be removed in the end.
   """
-  def make_yolo_node(state, layer_name, layer_dict) do
+  def make_yolo_node(state, layer_name, _layer_dict) do
     [state, layer_name <> "_dummy", 1]
   end
 
@@ -544,9 +475,9 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
   """
   def make_onnx_node(state, layer_name, layer_dict) do
     layer_type = layer_dict["type"]
-    major_node_specs = %{}
-    major_node_output_name = ""
-    major_node_output_channels = 0
+    # major_node_specs = %{}
+    # major_node_output_name = ""
+    # major_node_output_channels = 0
 
     [state, major_node_specs] =
       if state.input_tensor == nil do
@@ -602,11 +533,11 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
         weights_file_path -- location of the weights file
         verbose -- toggles if the graph is printed after creation (default: True)
   """
-  defp inner_create_major_node_specs(state, _layer_configs, []) do
+  def inner_create_major_node_specs(state, _layer_configs, []) do
     state
   end
 
-  defp inner_create_major_node_specs(state, layer_configs, acc) do
+  def inner_create_major_node_specs(state, layer_configs, acc) do
     layer_name = hd(acc)
     layer_dict = layer_configs[layer_name]
     [state, major_node_specs] = make_onnx_node(state, layer_name, layer_dict)
@@ -629,12 +560,10 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
 
       case layer_type do
         "convolutional" ->
-          [initializer_layer, inputs_layer] = DarknetToOnnx.WeightLoader.load_conv_weights(params)
-
+          # [initializer_layer, inputs_layer] = DarknetToOnnx.WeightLoader.load_conv_weights(params)
+          DarknetToOnnx.WeightLoader.load_conv_weights(params)
         "upsample" ->
-          [[], []]
-          [initializer_layer, inputs_layer] = DarknetToOnnx.WeightLoader.load_upsample_scales(params)
-
+          DarknetToOnnx.WeightLoader.load_upsample_scales(params)
         true ->
           raise "Unexpected layer_name"
       end
@@ -652,10 +581,11 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
 
     outputs =
       Enum.map(Map.keys(state.output_tensors), fn tensor_name ->
-        Helper.make_tensor_value_info(tensor_name, {:f, 32}, [1] ++ state.output_tensors[tensor_name])
+        # Helper.make_tensor_value_info(tensor_name, {:f, 32}, [1] ++ state.output_tensors[tensor_name])
+        Helper.make_tensor_value_info(tensor_name, 1, [1] ++ state.output_tensors[tensor_name])
       end)
 
-    weight_loader = DarknetToOnnx.WeightLoader.start_link(weights_file: weights_file_path)
+    DarknetToOnnx.WeightLoader.start_link(weights_file: weights_file_path)
     [initializer, inputs] = make_initializer_inputs(state)
     DarknetToOnnx.WeightLoader.stop_link()
 
@@ -670,8 +600,13 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
             initializer
           )
     }
+    if verbose == True do
+      Helper.printable_graph(state.graph_def)
+    end
+
+    Helper.make_model(state.graph_def, producer_name: "NVIDIA TensorRT sample")
 
     # DEVO TOGLIERLO NON DEVE TORNARE STATE !!!!!!!! ##################
-    state
+    #state
   end
 end
