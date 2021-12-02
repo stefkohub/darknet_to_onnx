@@ -39,29 +39,31 @@ defmodule DarknetToOnnx.ConvParams do
   # The first def is a header needed to use default values in parameter list.
   # In Elixir it is not possible to use default values in more than 1 function declaration.
   def generate_param_name(node_name, param_category, suffix \\ nil)
+
   def generate_param_name(node_name, param_category, suffix)
-    when suffix != nil and param_category in ["bn", "conv"] and 
-    suffix in ["scale", "mean", "var", "weights", "bias"] and
-    is_binary(node_name) do
+      when suffix != nil and param_category in ["bn", "conv"] and
+             suffix in ["scale", "mean", "var", "weights", "bias"] and
+             is_binary(node_name) do
     generate_param_name(get_state(node_name), param_category, suffix)
   end
 
   def generate_param_name(state, param_category, suffix)
-    when suffix != nil and param_category in ["bn", "conv"] and 
-    suffix in ["scale", "mean", "var", "weights", "bias"] do
-    
+      when suffix != nil and param_category in ["bn", "conv"] and
+             suffix in ["scale", "mean", "var", "weights", "bias"] do
     cond do
-      param_category == "bn" and state.batch_normalize != True and 
-      suffix not in ["scale", "bias", "mean", "var"] -> 
+      param_category == "bn" and state.batch_normalize != True and
+          suffix not in ["scale", "bias", "mean", "var"] ->
         raise "Error in generate_param_name: wrong suffix " <> suffix <> " for bn category"
+
       param_category == "conv" and suffix not in ["weights", "bias"] ->
         if suffix == "bias" and state.batch_normalize != True do
           raise "Error in generate_param_name: wrong suffix " <> suffix <> " for conv category"
         else
           raise "Error in generate_param_name: wrong suffix " <> suffix <> " for conv category"
         end
-      true -> state.node_name <> "_" <> param_category <> "_" <> suffix
+
+      true ->
+        state.node_name <> "_" <> param_category <> "_" <> suffix
     end
-    
   end
 end

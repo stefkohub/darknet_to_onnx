@@ -33,17 +33,15 @@ defmodule DarknetToOnnx.Helper do
     # TODO: add a zillion of checks on sizes and so on...
     # expected_size = Enum.reduce(Tuple.to_list(dims), 1, fn val, acc -> acc * val end)
     # TODO add support for complex and float 16 values...
-    IO.puts("DENTRO MAKE_TENSOR HO: " <> inspect([name, data_type, dims, vals, raw]))
 
     tensor = %TensorProto{
       data_type: data_type,
       name: name,
-      raw_data: raw && vals || "",
-      float_data: !raw && vals || [],
-      dims: Tuple.to_list(dims),
+      raw_data: (raw && vals) || "",
+      float_data: (!raw && vals) || [],
+      dims: Tuple.to_list(dims)
     }
 
-    IO.puts("DENTRO MAKE_TENSOR tensor= " <> inspect(tensor))
     tensor
   end
 
@@ -52,7 +50,7 @@ defmodule DarknetToOnnx.Helper do
 
     %Value{
       name: name,
-      doc_string: doc_string !== "" && doc_string || "",
+      doc_string: (doc_string !== "" && doc_string) || "",
       type: the_type
     }
   end
@@ -67,11 +65,11 @@ defmodule DarknetToOnnx.Helper do
            elem_type: elem_type,
            shape:
              if shape != nil do
-               if Utils.is_enum?(shape_denotation) == True and Enum.count(shape_denotation) != 0 and Enum.count(shape_denotation) != Enum.count(shape) do
+               if Utils.is_enum?(shape_denotation) == True and Enum.count(shape_denotation) != 0 and
+                    Enum.count(shape_denotation) != Enum.count(shape) do
                  raise "Invalid shape_denotation. Must be the same length as shape."
                end
 
-               IO.puts "KKKKK create_dimensions: "<>inspect([shape, shape_denotation])
                %Shape{dim: create_dimensions(shape, shape_denotation)}
              else
                %Shape{}
@@ -83,36 +81,39 @@ defmodule DarknetToOnnx.Helper do
   defp create_dimensions(shape, shape_denotation) do
     list_shape = (is_tuple(shape) && Tuple.to_list(shape)) || shape
 
-    list_shape 
-    |> Enum.with_index
+    list_shape
+    |> Enum.with_index()
     |> Enum.map(fn {acc, index} ->
-          cond do
-            is_integer(acc) ->
-              %Dimension{
-                value: {:dim_value, acc},
-                denotation:
-                  if shape_denotation != "" do
-                    Enum.at(shape_denotation, index)
-                  else
-                    ""
-                  end
-              }
-            is_binary(acc) ->
-              %Dimension{
-                value: {:dim_param, acc},
-                denotation:
-                  if shape_denotation != "" do
-                    Enum.at(shape_denotation, index)
-                  else
-                    ""
-                  end
-              }
-            [] -> 
-              _ = IO.puts "Ricevuto acc vuoto" 
-            true ->
-              raise "Invalid item in shape: "<>inspect(acc)<>". Needs to be integer or text type."
-          end
-        end)
+      cond do
+        is_integer(acc) ->
+          %Dimension{
+            value: {:dim_value, acc},
+            denotation:
+              if shape_denotation != "" do
+                Enum.at(shape_denotation, index)
+              else
+                ""
+              end
+          }
+
+        is_binary(acc) ->
+          %Dimension{
+            value: {:dim_param, acc},
+            denotation:
+              if shape_denotation != "" do
+                Enum.at(shape_denotation, index)
+              else
+                ""
+              end
+          }
+
+        [] ->
+          _ = IO.puts("Empty acc")
+
+        true ->
+          raise "Invalid item in shape: " <> inspect(acc) <> ". Needs to be integer or text type."
+      end
+    end)
     |> List.flatten()
   end
 
@@ -148,54 +149,59 @@ defmodule DarknetToOnnx.Helper do
   def printable_graph(graph, prefix \\ "") do
     indent = prefix <> "  "
     header = ["graph", graph.name]
-    #initializers = 
+    # initializers = 
   end
 
   def get_all_tensors(model) do
-    model.graph.initializer # TODO:, attributes from model.graph.node
+    #  TODO:, attributes from model.graph.node
+    model.graph.initializer
   end
 
   def set_external_data(tensor, location, offset \\ nil, length \\ nil, checksum \\ nil, basepath \\ nil) do
     if !Map.has_key?(tensor, "raw_data") do
       raise "raw_data field doesn't exist."
     end
-    %{ tensor |
-      data_location: :EXTERNAL,
-      external_data: Utils.cfl(tensor.external_data, [%{
-        "location" => location,
-        "offset" => offset,
-        "length" => length,
-        "checksum" => checksum,
-        "basepath" => basepath
-        }])
-    }
 
+    %{
+      tensor
+      | data_location: :EXTERNAL,
+        external_data:
+          Utils.cfl(tensor.external_data, [
+            %{
+              "location" => location,
+              "offset" => offset,
+              "length" => length,
+              "checksum" => checksum,
+              "basepath" => basepath
+            }
+          ])
+    }
   end
 
   def save_external_data(tensor, filepath) do
     info = ExternalDataInfo.start_link(tensor)
     external_data_file_path = Path.join(filepath, info.location)
+
     if !Map.has_key?(tensor, "raw_data") do
       raise "raw_data field doesn't exist."
     end
+
     {:ok, data_file} = File.open(external_data_file_path, [:binary, :write])
-    #TODO: Should ensure appending to the file
+    # TODO: Should ensure appending to the file
     # TODO: if info.offset ....
     IO.binwrite(data_file, tensor.raw_data.data.state)
     # return a new tensor
     File.close(data_file)
-    {:ok, %{size: offset}} = File.stat! external_data_file_path 
+    {:ok, %{size: offset}} = File.stat!(external_data_file_path)
     set_external_data(tensor, info.location, offset, byte_size(tensor.raw_data.data.state))
   end
 
   def uses_external_data(tensor) do
-    IO.puts("DENTRO uses_external_data ho: "<>inspect(tensor))
     Map.has_key?(tensor, "data_location") and tensor.data_location == :EXTERNAL
   end
 
   def write_external_data_tensors(model, filepath) do
-    Enum.each(get_all_tensors(model), fn tensor -> 
-      IO.puts "DENTRO IL CICLO EACH HO: "<>inspect tensor
+    Enum.each(get_all_tensors(model), fn tensor ->
       if uses_external_data(tensor) do
         save_external_data(tensor, filepath)
         # TODO: tensor.ClearField("raw_data")
@@ -211,57 +217,85 @@ defmodule DarknetToOnnx.Helper do
   end
 
   def is_TensorProto(val) do
-    (is_map(val) and Map.has_key?(val,:__struct__)
-        and val.__struct__ === Onnx.TensorProto)
+    is_map(val) and Map.has_key?(val, :__struct__) and
+      val.__struct__ === Onnx.TensorProto
   end
+
   def is_SparseTensorProto(val) do
-    (is_map(val) and Map.has_key?(val,:__struct__)
-        and val.__struct__ === Onnx.SparseTensorProto)
+    is_map(val) and Map.has_key?(val, :__struct__) and
+      val.__struct__ === Onnx.SparseTensorProto
   end
+
   def is_GraphProto(val) do
-    (is_map(val) and Map.has_key?(val,:__struct__)
-        and val.__struct__ === Onnx.GraphProto)
+    is_map(val) and Map.has_key?(val, :__struct__) and
+      val.__struct__ === Onnx.GraphProto
   end
+
   def is_TypeProto(val) do
-    (is_map(val) and Map.has_key?(val,:__struct__)
-        and val.__struct__ === Onnx.TypeProto)
+    is_map(val) and Map.has_key?(val, :__struct__) and
+      val.__struct__ === Onnx.TypeProto
   end
 
   def inner_make_attribute(key, val) do
     newAttr = %Attribute{
-      name: Atom.to_string(key),
+      name: Atom.to_string(key)
     }
-    to_add = cond do
-      is_float(val) -> %{f: val, type: :FLOAT}
-      is_integer(val) -> %{i: val, type: :INT}
-      is_binary(val) or is_boolean(val) -> %{s: val, type: :STRING}
-      is_TensorProto(val) -> %{t: val, type: :TENSOR}
-      is_SparseTensorProto(val) -> %{sparse_tensor: val, type: :SPARSE_TENSOR}
-      is_GraphProto(val) -> %{g: val, type: :GRAPH}
-      is_TypeProto(val) -> %{tp: val, type: :TYPE_PROTO}
-      Utils.is_enum?(val) && Enum.all?(val, fn x -> is_integer(x) end) ->
-        %{ints: val, type: :INTS}
-      Utils.is_enum?(val) and Enum.all?(val, fn x -> is_float(x) or is_integer(x) end) ->
-        # Convert all the numbers to float
-        %{floats: Enum.map(val, fn v -> v / 1 end), type: :FLOATS}
-      Utils.is_enum?(val) and Enum.all?(val, fn x -> is_binary(x) end) ->
-        %{strings: val, type: :STRINGS}
-      Utils.is_enum?(val) and Enum.all?(val, fn x -> is_TensorProto(x) end) ->
-        %{tensors: val, type: :TENSORS}
-      Utils.is_enum?(val) and Enum.all?(val, fn x -> is_SparseTensorProto(x) end) ->
-        %{sparse_tensors: val, type: :SPARSE_TENSORS}
-      Utils.is_enum?(val) and Enum.all?(val, fn x -> is_GraphProto(x) end) ->
-        %{graphs: val, type: :GRAPHS}
-      Utils.is_enum?(val) and Enum.all?(val, fn x -> is_TypeProto(x) end) ->
-        %{type_protos: val, type: :TYPE_PROTOS}
-    end
+
+    to_add =
+      cond do
+        is_float(val) ->
+          %{f: val, type: :FLOAT}
+
+        is_integer(val) ->
+          %{i: val, type: :INT}
+
+        is_binary(val) or is_boolean(val) ->
+          %{s: val, type: :STRING}
+
+        is_TensorProto(val) ->
+          %{t: val, type: :TENSOR}
+
+        is_SparseTensorProto(val) ->
+          %{sparse_tensor: val, type: :SPARSE_TENSOR}
+
+        is_GraphProto(val) ->
+          %{g: val, type: :GRAPH}
+
+        is_TypeProto(val) ->
+          %{tp: val, type: :TYPE_PROTO}
+
+        Utils.is_enum?(val) && Enum.all?(val, fn x -> is_integer(x) end) ->
+          %{ints: val, type: :INTS}
+
+        Utils.is_enum?(val) and Enum.all?(val, fn x -> is_float(x) or is_integer(x) end) ->
+          # Convert all the numbers to float
+          %{floats: Enum.map(val, fn v -> v / 1 end), type: :FLOATS}
+
+        Utils.is_enum?(val) and Enum.all?(val, fn x -> is_binary(x) end) ->
+          %{strings: val, type: :STRINGS}
+
+        Utils.is_enum?(val) and Enum.all?(val, fn x -> is_TensorProto(x) end) ->
+          %{tensors: val, type: :TENSORS}
+
+        Utils.is_enum?(val) and Enum.all?(val, fn x -> is_SparseTensorProto(x) end) ->
+          %{sparse_tensors: val, type: :SPARSE_TENSORS}
+
+        Utils.is_enum?(val) and Enum.all?(val, fn x -> is_GraphProto(x) end) ->
+          %{graphs: val, type: :GRAPHS}
+
+        Utils.is_enum?(val) and Enum.all?(val, fn x -> is_TypeProto(x) end) ->
+          %{type_protos: val, type: :TYPE_PROTOS}
+      end
+
     Map.merge(newAttr, to_add)
   end
 
   def make_attribute(kwargs) do
-    sortedargs=for {k, v} <- Enum.sort(kwargs), v != "", do: {k,v} 
-    sortedargs |> Enum.reduce([], fn {key, val}, acc ->
-      [ inner_make_attribute(key, val) | acc ]
+    sortedargs = for {k, v} <- Enum.sort(kwargs), v != "", do: {k, v}
+
+    sortedargs
+    |> Enum.reduce([], fn {key, val}, acc ->
+      [inner_make_attribute(key, val) | acc]
     end)
   end
 
@@ -278,7 +312,7 @@ defmodule DarknetToOnnx.Helper do
         kwargs (dict): the attributes of the node.  The acceptable values
             are documented in :func:`make_attribute`.
   """
-  def make_node(op_type, inputs, outputs, name \\ "",  kwargs \\ [], doc_string \\ "",  domain \\ "") do
+  def make_node(op_type, inputs, outputs, name \\ "", kwargs \\ [], doc_string \\ "", domain \\ "") do
     %Onnx.NodeProto{
       op_type: op_type,
       input: inputs,

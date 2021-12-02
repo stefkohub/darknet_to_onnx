@@ -35,10 +35,10 @@ defmodule DarknetToOnnx.Learning do
         Check whether a variable is enumerable
   """
   def is_enum?(var) do
-    if is_list(var) or 
-       (is_map(var) and not Map.has_key?(var,:__struct__)) or
-       is_tuple(var) do
-      True 
+    if is_list(var) or
+         (is_map(var) and not Map.has_key?(var, :__struct__)) or
+         is_tuple(var) do
+      True
     else
       False
     end

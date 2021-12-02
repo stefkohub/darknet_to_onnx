@@ -110,14 +110,20 @@ defmodule DarknetToOnnx.ParseDarknet do
 
   def parse_cfg_file(state, cfg_file_path) do
     {:ok, parse_result} = ConfigParser.parse_file(cfg_file_path)
+
     parse_result =
       Enum.map(parse_result, fn {name, datamap} ->
         [_, new_type] = String.split(name, "_")
-        {name, Enum.map(datamap, fn {k,v} ->
-          [_ptype, pvalue] = DarknetToOnnx.ParseDarknet.parse_params({k,v})
-          {k, pvalue}
-        end) ++ [{"type", new_type}]|>Map.new()}
-      end)|>Map.new()
+
+        {name,
+         (Enum.map(datamap, fn {k, v} ->
+            [_ptype, pvalue] = DarknetToOnnx.ParseDarknet.parse_params({k, v})
+            {k, pvalue}
+          end) ++ [{"type", new_type}])
+         |> Map.new()}
+      end)
+      |> Map.new()
+
     %{state | :parse_result => parse_result, :keys => Map.keys(parse_result)}
   end
 
@@ -159,24 +165,26 @@ defmodule DarknetToOnnx.ParseDarknet do
     # convs = Enum.filter(state.keys, fn(k) -> Regex.run(~r{.*convolutional}, k) end)
     state = %{state | :output_convs => []}
     output_convs = inner_get_output_convs(state, yolos)
-    Agent.update(__MODULE__, fn _s -> %{state | output_convs: output_convs } end)
+    Agent.update(__MODULE__, fn _s -> %{state | output_convs: output_convs} end)
     output_convs
   end
 
   defp inner_get_output_convs(state, yolos) when yolos != [] do
     Enum.map(yolos, fn y ->
       [yindex, _] = String.split(y, "_")
+
       layer_to_find =
         (String.to_integer(yindex) - 1)
         |> Integer.to_string()
         |> String.pad_leading(3, "0")
 
       previous_layer = layer_to_find <> "_convolutional"
+
       if Enum.member?(state.keys, previous_layer) do
         case state.parse_result[previous_layer]["activation"] do
           "linear" -> previous_layer
-          "logistic" -> previous_layer<>"_lgx"
-          _ -> raise("Unexpected activation: "<>state.parse_result[previous_layer]["activation"])
+          "logistic" -> previous_layer <> "_lgx"
+          _ -> raise("Unexpected activation: " <> state.parse_result[previous_layer]["activation"])
         end
       else
         y

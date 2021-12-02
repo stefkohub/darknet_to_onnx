@@ -62,7 +62,6 @@ defmodule DarknetToOnnx.WeightLoader do
         'weights' or 'bias')
   """
   def load_one_param_type(conv_params, param_category, suffix) do
-    IO.puts "FACCIO IL load_one_param_type PER: "<>inspect([param_category, conv_params])
     param_name = DarknetToOnnx.ConvParams.generate_param_name(conv_params.node_name, param_category, suffix)
     [channels_out, channels_in, filter_h, filter_w] = conv_params.conv_weight_dims
 
@@ -70,6 +69,7 @@ defmodule DarknetToOnnx.WeightLoader do
       case param_category do
         "bn" ->
           {channels_out}
+
         "conv" ->
           case suffix do
             "weights" -> {channels_out, channels_in, filter_h, filter_w}
@@ -102,8 +102,8 @@ defmodule DarknetToOnnx.WeightLoader do
     [param_name, param_data, param_data_shape] = load_one_param_type(conv_params, param_category, suffix)
 
     # Nx.reshape(param_data, name: param_name)
-    #initializer_tensor = param_data
-    #input_tensor = []
+    # initializer_tensor = param_data
+    # input_tensor = []
 
     initializer_tensor =
       DarknetToOnnx.Helper.make_tensor(
@@ -113,10 +113,13 @@ defmodule DarknetToOnnx.WeightLoader do
         param_data
       )
 
-    input_tensor = Helper.make_tensor_value_info(
-      param_name, 
-      1,
-      param_data_shape)
+    input_tensor =
+      Helper.make_tensor_value_info(
+        param_name,
+        1,
+        param_data_shape
+      )
+
     [initializer_tensor, input_tensor]
   end
 
@@ -158,13 +161,13 @@ defmodule DarknetToOnnx.WeightLoader do
         upsample_params -- a UpsampleParams object
   """
   def load_upsample_scales(upsample_params) do
-    IO.puts("QUI RICEVO: " <> inspect(upsample_params))
     upsample_state = DarknetToOnnx.UpsampleParams.get_state(upsample_params.node_name)
 
     scale_init =
       Helper.make_tensor(
         DarknetToOnnx.UpsampleParams.generate_param_name(upsample_state),
-        1, #{:f, 32},
+        # {:f, 32},
+        1,
         upsample_state.value.shape,
         upsample_state.value.data.state
       )
@@ -172,7 +175,8 @@ defmodule DarknetToOnnx.WeightLoader do
     scale_input =
       Helper.make_tensor_value_info(
         DarknetToOnnx.UpsampleParams.generate_param_name(upsample_state),
-        1, #{:f, 32},
+        # {:f, 32},
+        1,
         upsample_state.value.shape
       )
 

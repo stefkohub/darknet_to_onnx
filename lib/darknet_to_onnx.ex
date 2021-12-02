@@ -54,7 +54,6 @@ defmodule DarknetToOnnx do
     end
 
     builder = DarknetToOnnx.GraphBuilderONNX.get_state(gb_pid)
-    IO.puts("qui builder=" <> inspect([builder,layer_configs]))
 
     yolo_model_def =
       DarknetToOnnx.GraphBuilderONNX.build_onnx_graph(
@@ -64,8 +63,8 @@ defmodule DarknetToOnnx do
         verbose = True
       )
 
-    IO.puts "Saving ONNX file..."
-    
+    IO.puts("Saving ONNX file...")
+
     Helper.save_model(yolo_model_def, @output_path)
     yolo_model_def
   end
