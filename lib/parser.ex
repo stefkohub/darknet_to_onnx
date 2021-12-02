@@ -84,7 +84,7 @@ defmodule DarknetToOnnx.ParseDarknet do
         Keyword argument:
         cfg_file_path
   """
-  def parse_cfg_file(state, cfg_file_path) do
+  def old_parse_cfg_file(state, cfg_file_path) do
     # TODO: Add checks on file parsing
     {:ok, parse_result} = ConfigParser.parse_file(cfg_file_path)
     keys = Map.keys(parse_result)
@@ -106,6 +106,19 @@ defmodule DarknetToOnnx.ParseDarknet do
     parse_result = DarknetToOnnx.Learning.update_map_adding_type(parse_result)
     # IO.puts("Qui parse_result=" <> inspect(parse_result))
     %{state | :parse_result => parse_result, :keys => keys}
+  end
+
+  def parse_cfg_file(state, cfg_file_path) do
+    {:ok, parse_result} = ConfigParser.parse_file(cfg_file_path)
+    parse_result =
+      Enum.map(parse_result, fn {name, datamap} ->
+        [_, new_type] = String.split(name, "_")
+        {name, Enum.map(datamap, fn {k,v} ->
+          [_ptype, pvalue] = DarknetToOnnx.ParseDarknet.parse_params({k,v})
+          {k, pvalue}
+        end) ++ [{"type", new_type}]|>Map.new()}
+      end)|>Map.new()
+    %{state | :parse_result => parse_result, :keys => Map.keys(parse_result)}
   end
 
   def get_state() do

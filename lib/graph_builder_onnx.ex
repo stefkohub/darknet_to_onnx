@@ -131,14 +131,13 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
     inputs = Utils.cfl(inputs, for suffix <- ["scale", "bias", "mean", "var"] do
             DarknetToOnnx.ConvParams.generate_param_name(conv_params_state, "bn", suffix)
           end)
-    [ Helper.make_node("BatchNormalization",
+    Helper.make_node("BatchNormalization",
          inputs,
          [layer_name_output <> "_bn"], 
          layer_name_output <> "_bn", %{
            epsilon: state.epsilon_bn,
            momentum: state.momentum_bn
-        }),
-      inputs]
+        })
   end
 
   def make_conv_node_leaky_relu(state, inputs, _conv_params_state, layer_name) do
@@ -150,18 +149,22 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
 
   def make_conv_node_mish(_state, inputs, _conv_params_state, layer_name) do
     layer_name_softplus = layer_name <> "_softplus"
+    layer_name_tanh = layer_name<>"_tanh"
+    layer_name_mish = layer_name <> "_mish"
 
     [
       Helper.make_node("Softplus",inputs,[layer_name_softplus], layer_name_softplus),
-      Helper.make_node("Tanh",[layer_name_softplus],[layer_name <> "_tanh"],layer_name <> "_tanh"),
-      Helper.make_node("Mul", inputs, [layer_name <> "_mish"], layer_name <> "_mish")
+      Helper.make_node("Tanh",[layer_name_softplus],[layer_name_tanh],layer_name_tanh),
+      Helper.make_node("Mul", Utils.cfl(inputs, layer_name_tanh), [layer_name_mish], layer_name_mish)
     ]
   end
 
   def make_conv_node_swish(_state, inputs, _conv_params_state, layer_name) do
+    layer_name_sigmoid = layer_name <> "_sigmoid"
+    layer_name_swish = layer_name <> "_swish"
     [
-      Helper.make_node("Sigmoid", inputs, [layer_name <> "_sigmoid"],layer_name <> "_sigmoid"),
-      Helper.make_node("Mul",Utils.cfl(inputs, layer_name <> "_sigmoid"),[layer_name <> "_swish"],layer_name <> "_swish")
+      Helper.make_node("Sigmoid", inputs, [layer_name_sigmoid],layer_name_sigmoid),
+      Helper.make_node("Mul",Utils.cfl(inputs, layer_name_sigmoid),[layer_name_swish],layer_name_swish)
     ]
   end
 
@@ -223,7 +226,7 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
     IO.puts "IN INGRESSO HO: "<>inspect([layer_name_output, inputs])
     [state, layer_name_output, inputs] =
       if conv_params_state.batch_normalize == True do
-        [ new_nodes, inputs ] = make_conv_node_batch_normalize(state, inputs, conv_params_state, layer_name)
+        new_nodes = make_conv_node_batch_normalize(state, inputs, conv_params_state, layer_name)
         [
           %{state | nodes: Utils.cfl(state.nodes, new_nodes)},
           layer_name <> "_bn",
@@ -239,7 +242,7 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
         "leaky" ->
           [
             %{state | nodes: Utils.cfl(state.nodes, [make_conv_node_leaky_relu(state, inputs, conv_params_state, layer_name)])},
-            layer_name <> "_leaky"
+            layer_name <> "_lrelu"
           ]
 
         "mish" ->
@@ -540,26 +543,6 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
         weights_file_path -- location of the weights file
         verbose -- toggles if the graph is printed after creation (default: True)
   """
-  def inner_create_major_node_specs(state, _layer_configs, []) do
-    state
-  end
-
-  def inner_create_major_node_specs(state, layer_configs, acc) do
-    layer_name = hd(acc)
-    layer_dict = layer_configs[layer_name]
-    [state, major_node_specs] = make_onnx_node(state, layer_name, layer_dict)
-
-    state =
-      try do
-        # state = if major_node_specs != nil and major_node_specs.name != nil do
-        %{state | major_node_specs: Utils.cfl(state.major_node_specs, major_node_specs)}
-      rescue
-        e in RuntimeError -> e
-      end
-
-    inner_create_major_node_specs(state, layer_configs, tl(acc))
-  end
-
   def make_initializer_inputs(state) do
     Enum.map(Map.keys(state.param_dict), fn layer_name ->
       [_, layer_type] = String.split(layer_name, "_")
