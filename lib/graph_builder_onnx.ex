@@ -184,13 +184,13 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
     # inputs = [previous_node_specs.name]
     kernel_shape = [layer_dict["size"], layer_dict["size"]]
     weights_shape = Utils.cfl([layer_dict["filters"], previous_node_specs.channels], kernel_shape)
-    IO.puts "PER IL NODO "<>previous_node_specs.name<>" HO: "<>inspect([weights_shape])
 
+    IO.puts "DENTRO make_conv_node batch_normalize="<>inspect([layer_name,layer_dict["batch_normalize"]])
     conv_params_state =
       DarknetToOnnx.ConvParams.start_link(
         node_name: layer_name,
-        batch_normalize:
-          if layer_dict["batch_normalize"] > 0 do
+        batch_normalize: 
+          if layer_dict["batch_normalize"] != nil and layer_dict["batch_normalize"] > 0 do
             True
           else
             False
@@ -201,6 +201,7 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
     strides = [layer_dict["stride"], layer_dict["stride"]]
     dilations = [1, 1]
     weights_name = DarknetToOnnx.ConvParams.generate_param_name(conv_params_state, "conv", "weights")
+    IO.puts "DENTRO make_conv_node ho"<>inspect([conv_params_state, weights_name, previous_node_specs.name])
 
     inputs =
       if conv_params_state.batch_normalize != True do
@@ -260,7 +261,7 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
         "logistic" ->
           [
             %{state | nodes: Utils.cfl(state.nodes, [make_conv_node_logistic(state, inputs, conv_params_state, layer_name)])},
-            layer_name <> "_logistic"
+            layer_name <> "_lgx"
           ]
 
         "linear" ->

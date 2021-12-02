@@ -50,17 +50,18 @@ defmodule DarknetToOnnx.ConvParams do
     when suffix != nil and param_category in ["bn", "conv"] and 
     suffix in ["scale", "mean", "var", "weights", "bias"] do
     
-    if param_category == "bn" and state.batch_normalize != True and suffix not in ["scale", "bias", "mean", "var"] do
-      raise "Error in generate_param_name: wrong suffix " <> suffix <> " for bn category"
+    cond do
+      param_category == "bn" and state.batch_normalize != True and 
+      suffix not in ["scale", "bias", "mean", "var"] -> 
+        raise "Error in generate_param_name: wrong suffix " <> suffix <> " for bn category"
+      param_category == "conv" and suffix not in ["weights", "bias"] ->
+        if suffix == "bias" and state.batch_normalize != True do
+          raise "Error in generate_param_name: wrong suffix " <> suffix <> " for conv category"
+        else
+          raise "Error in generate_param_name: wrong suffix " <> suffix <> " for conv category"
+        end
+      true -> state.node_name <> "_" <> param_category <> "_" <> suffix
     end
-
-    if param_category == "conv" and suffix not in ["weights"] do
-      raise "Error in generate_param_name: wrong suffix " <> suffix <> " for conv category"
-    end
-    if param_category == "conv" and suffix not in ["bias"] and state.batch_normalize != True do
-      raise "Error in generate_param_name: wrong suffix " <> suffix <> " for conv category"
-    end
-
-    state.node_name <> "_" <> param_category <> "_" <> suffix
+    
   end
 end
