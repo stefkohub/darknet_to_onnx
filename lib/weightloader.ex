@@ -62,6 +62,7 @@ defmodule DarknetToOnnx.WeightLoader do
         'weights' or 'bias')
   """
   def load_one_param_type(conv_params, param_category, suffix) do
+    IO.puts "FACCIO IL load_one_param_type PER: "<>inspect([param_category, conv_params])
     param_name = DarknetToOnnx.ConvParams.generate_param_name(conv_params.node_name, param_category, suffix)
     [channels_out, channels_in, filter_h, filter_w] = conv_params.conv_weight_dims
 
@@ -69,12 +70,10 @@ defmodule DarknetToOnnx.WeightLoader do
       case param_category do
         "bn" ->
           {channels_out}
-
         "conv" ->
-          if suffix == "weights" do
-            {channels_out, channels_in, filter_h, filter_w}
-          else
-            {channels_out}
+          case suffix do
+            "weights" -> {channels_out, channels_in, filter_h, filter_w}
+            "bias" -> {channels_out}
           end
       end
 

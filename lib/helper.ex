@@ -4,8 +4,8 @@ defmodule DarknetToOnnx.Helper do
     (ported from: https://github.com/onnx/onnx/blob/master/onnx/helper.py)
   """
 
-  @onnx_opset_version 13
-  @onnx_ir_version 3
+  @onnx_opset_version 15
+  @onnx_ir_version 8
   @output_file_name "yolov3-tiny-416-SF.onnx"
 
   alias DarknetToOnnx.Learning, as: Utils
@@ -37,9 +37,10 @@ defmodule DarknetToOnnx.Helper do
 
     tensor = %TensorProto{
       data_type: data_type,
+      name: name,
       raw_data: raw && vals || "",
       float_data: !raw && vals || [],
-      dims: Tuple.to_list(dims)
+      dims: Tuple.to_list(dims),
     }
 
     IO.puts("DENTRO MAKE_TENSOR tensor= " <> inspect(tensor))
@@ -82,41 +83,36 @@ defmodule DarknetToOnnx.Helper do
   defp create_dimensions(shape, shape_denotation) do
     list_shape = (is_tuple(shape) && Tuple.to_list(shape)) || shape
 
-    Enum.reduce(list_shape |> Enum.with_index(), [], fn {value, index}, acc ->
-      create_dimensions_reduce(shape_denotation, value, index, acc)
-    end)|>Enum.reverse()
-  end
-
-  defp create_dimensions_reduce(shape_denotation, value, index, acc) do
-    [value, acc]
-    |> Enum.map(fn acc ->
-      cond do
-        is_integer(acc) ->
-          %Dimension{
-            value: {:dim_value, acc},
-            denotation:
-              if shape_denotation != "" do
-                Enum.at(shape_denotation, index)
-              else
-                ""
-              end
-          }
-
-        is_binary(acc) ->
-          %Dimension{
-            value: {:dim_param, acc},
-            denotation:
-              if shape_denotation != "" do
-                Enum.at(shape_denotation, index)
-              else
-                ""
-              end
-          }
-
-        true ->
-          acc
-      end
-    end)
+    list_shape 
+    |> Enum.with_index
+    |> Enum.map(fn {acc, index} ->
+          cond do
+            is_integer(acc) ->
+              %Dimension{
+                value: {:dim_value, acc},
+                denotation:
+                  if shape_denotation != "" do
+                    Enum.at(shape_denotation, index)
+                  else
+                    ""
+                  end
+              }
+            is_binary(acc) ->
+              %Dimension{
+                value: {:dim_param, acc},
+                denotation:
+                  if shape_denotation != "" do
+                    Enum.at(shape_denotation, index)
+                  else
+                    ""
+                  end
+              }
+            [] -> 
+              _ = IO.puts "Ricevuto acc vuoto" 
+            true ->
+              raise "Invalid item in shape: "<>inspect(acc)<>". Needs to be integer or text type."
+          end
+        end)
     |> List.flatten()
   end
 
@@ -282,7 +278,7 @@ defmodule DarknetToOnnx.Helper do
         kwargs (dict): the attributes of the node.  The acceptable values
             are documented in :func:`make_attribute`.
   """
-  def make_node(op_type, inputs, outputs, name \\ "",  doc_string \\ "",  domain \\ "",  kwargs) do
+  def make_node(op_type, inputs, outputs, name \\ "",  kwargs \\ [], doc_string \\ "",  domain \\ "") do
     %Onnx.NodeProto{
       op_type: op_type,
       input: inputs,

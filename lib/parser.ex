@@ -145,32 +145,30 @@ defmodule DarknetToOnnx.ParseDarknet do
     yolos = Enum.filter(state.keys, fn k -> Regex.run(~r{.*yolo}, k) end)
     # convs = Enum.filter(state.keys, fn(k) -> Regex.run(~r{.*convolutional}, k) end)
     state = %{state | :output_convs => []}
-    new_state = inner_get_output_convs(state, yolos)
-    Agent.update(__MODULE__, fn _s -> new_state end)
-    new_state.output_convs
-  end
-
-  defp inner_get_output_convs(state, []) do
-    state
+    output_convs = inner_get_output_convs(state, yolos)
+    Agent.update(__MODULE__, fn _s -> %{state | output_convs: output_convs } end)
+    output_convs
   end
 
   defp inner_get_output_convs(state, yolos) when yolos != [] do
-    y = hd(yolos)
-    [yindex, _] = String.split(y, "_")
+    Enum.map(yolos, fn y ->
+      [yindex, _] = String.split(y, "_")
+      layer_to_find =
+        (String.to_integer(yindex) - 1)
+        |> Integer.to_string()
+        |> String.pad_leading(3, "0")
 
-    layer_to_find =
-      (String.to_integer(yindex) - 1)
-      |> Integer.to_string()
-      |> String.pad_leading(3, "0")
-
-    layer_to_find = layer_to_find <> "_convolutional"
-
-    state =
-      if Enum.member?(state.keys, layer_to_find) do
-        %{state | :output_convs => [layer_to_find] ++ state.output_convs}
+      previous_layer = layer_to_find <> "_convolutional"
+      if Enum.member?(state.keys, previous_layer) do
+        case state.parse_result[previous_layer]["activation"] do
+          "linear" -> previous_layer
+          "logistic" -> previous_layer<>"_lgx"
+          _ -> raise("Unexpected activation: "<>state.parse_result[previous_layer]["activation"])
+        end
+      else
+        y
       end
-
-    inner_get_output_convs(state, tl(yolos))
+    end)
   end
 
   @doc """

@@ -36,21 +36,29 @@ defmodule DarknetToOnnx.ConvParams do
         Generates a name based on two string inputs,
         and checks if the combination is valid.
   """
+  # The first def is a header needed to use default values in parameter list.
+  # In Elixir it is not possible to use default values in more than 1 function declaration.
+  def generate_param_name(node_name, param_category, suffix \\ nil)
   def generate_param_name(node_name, param_category, suffix)
-      when param_category in ["bn", "conv"] and suffix in ["scale", "mean", "var", "weights", "bias"] and
-             is_binary(node_name) do
+    when suffix != nil and param_category in ["bn", "conv"] and 
+    suffix in ["scale", "mean", "var", "weights", "bias"] and
+    is_binary(node_name) do
     generate_param_name(get_state(node_name), param_category, suffix)
   end
 
   def generate_param_name(state, param_category, suffix)
-      when param_category in ["bn", "conv"] and suffix in ["scale", "mean", "var", "weights", "bias"] do
-    # TODO (considering use of fetch! in start_link)
-    if param_category == "bn" and suffix not in ["scale", "bias", "mean", "var"] do
+    when suffix != nil and param_category in ["bn", "conv"] and 
+    suffix in ["scale", "mean", "var", "weights", "bias"] do
+    
+    if param_category == "bn" and state.batch_normalize != True and suffix not in ["scale", "bias", "mean", "var"] do
       raise "Error in generate_param_name: wrong suffix " <> suffix <> " for bn category"
     end
 
-    if param_category == "conv" and suffix not in ["weights", "bias"] do
-      raise "Error in generate_param_name: wrong suffix " <> suffix <> " for bias category"
+    if param_category == "conv" and suffix not in ["weights"] do
+      raise "Error in generate_param_name: wrong suffix " <> suffix <> " for conv category"
+    end
+    if param_category == "conv" and suffix not in ["bias"] and state.batch_normalize != True do
+      raise "Error in generate_param_name: wrong suffix " <> suffix <> " for conv category"
     end
 
     state.node_name <> "_" <> param_category <> "_" <> suffix

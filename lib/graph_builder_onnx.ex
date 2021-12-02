@@ -110,16 +110,16 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
       if state.route_spec != 0 do
         # TODO: assert 'dummy' not in previous_node.name
         r = [%{state | route_spec: 0}, Enum.at(state.major_node_specs, state.route_spec)]
-        # IO.puts("get_previous_node_specs ritorna 1: " <> inspect([state.route_spec, state.major_node_specs, r]))
+        IO.puts("NEW get_previous_node_specs ritorna 1: " <> inspect([state.route_spec, state.major_node_specs, r]))
         r
       else
         r = [state, Enum.at(state.major_node_specs, -1)]
-        # IO.puts("get_previous_node_specs ritorna 2: " <> inspect(r))
+        IO.puts("NEW get_previous_node_specs ritorna 2: " <> inspect(r))
         r
       end
     else
       r = [state, Enum.at(state.major_node_specs, target_index)]
-      # IO.puts("get_previous_node_specs ritorna 3: " <> inspect(r))
+      IO.puts("NEW get_previous_node_specs ritorna 3: " <> inspect(r))
       r
     end
 
@@ -181,6 +181,7 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
     # inputs = [previous_node_specs.name]
     kernel_shape = [layer_dict["size"], layer_dict["size"]]
     weights_shape = Utils.cfl([layer_dict["filters"], previous_node_specs.channels], kernel_shape)
+    IO.puts "PER IL NODO "<>previous_node_specs.name<>" HO: "<>inspect([weights_shape])
 
     conv_params_state =
       DarknetToOnnx.ConvParams.start_link(
@@ -199,7 +200,7 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
     weights_name = DarknetToOnnx.ConvParams.generate_param_name(conv_params_state, "conv", "weights")
 
     inputs =
-      if !conv_params_state.batch_normalize do
+      if conv_params_state.batch_normalize != True do
         Utils.cfl([], [
           previous_node_specs.name,
           weights_name,
@@ -219,17 +220,19 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
     layer_name_output = layer_name
     inputs = [layer_name]
 
+    IO.puts "IN INGRESSO HO: "<>inspect([layer_name_output, inputs])
     [state, layer_name_output, inputs] =
       if conv_params_state.batch_normalize == True do
         [ new_nodes, inputs ] = make_conv_node_batch_normalize(state, inputs, conv_params_state, layer_name)
         [
           %{state | nodes: Utils.cfl(state.nodes, new_nodes)},
           layer_name <> "_bn",
-          inputs
+          [layer_name <> "_bn"]
         ]
       else
         [state, layer_name_output, inputs]
       end
+    IO.puts "IN USCITA HO: "<>inspect([layer_name_output, inputs])
 
     [state, layer_name_output] =
       case layer_dict["activation"] do
@@ -289,7 +292,10 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
             Utils.cfl(
               state.nodes,
               [
-                Helper.make_node("MaxPool",[previous_node_specs.name],[layer_name],layer_name,%{
+                Helper.make_node("MaxPool",
+                  [previous_node_specs.name],
+                  [layer_name],
+                  layer_name, %{
                     kernel_shape: [layer_dict["size"], layer_dict["size"]],
                     auto_pad: "SAME_UPPER",
                     strides: [layer_dict["stride"], layer_dict["stride"]]
@@ -429,10 +435,9 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
         layer_dict -- a layer parameter dictionary (one element of layer_configs)
   """
   def make_upsample_node(state, layer_name, layer_dict) do
-    ## This is converting an integer to a float
+    ## Converting an integer to a float
     upsample_factor = layer_dict["stride"] / 1
     scales = Nx.tensor([1.0, 1.0, upsample_factor, upsample_factor], type: {:f, 32})
-    # scales = [1.0, 1.0, upsample_factor, upsample_factor]
     [state, previous_node_specs] = get_previous_node_specs(state)
 
     if previous_node_specs.channels <= 0 do
@@ -478,6 +483,8 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
     # major_node_specs = %{}
     # major_node_output_name = ""
     # major_node_output_channels = 0
+
+    IO.puts("KKKK make_onnx_node type,name="<>inspect([layer_type, layer_name, state.input_tensor]))
 
     [state, major_node_specs] =
       if state.input_tensor == nil do
@@ -575,16 +582,28 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
     end)
   end
 
+  def create_major_node_specs(state, layer_configs) do
+    Enum.reduce(Map.keys(layer_configs), {state, []}, fn layer_name, acc ->
+      layer_dict = layer_configs[layer_name]
+      {state, major_node_specs}=acc
+      [state, new_major_node_specs] = make_onnx_node(state, layer_name, layer_dict)
+      state = %{ state | major_node_specs: Utils.cfl(major_node_specs,new_major_node_specs) }
+      {state, state.major_node_specs}
+    end)
+  end
+
   def build_onnx_graph(state, layer_configs, weights_file_path, verbose \\ True) do
-    state = inner_create_major_node_specs(state, layer_configs, Map.keys(layer_configs))
-    state = %{state | major_node_specs: Enum.filter(state.major_node_specs, fn x -> !String.contains?(x.name, "dummy") end)}
+    IO.puts "Quando entro qui dentro state ho major_node_specs="<>inspect(state.major_node_specs)
+    {state, major_node_specs} = create_major_node_specs(state, layer_configs)
+    state = %{state | major_node_specs: Utils.cfl(state.major_node_specs,major_node_specs)|> Enum.filter(fn x -> !String.contains?(x.name, "dummy") end)}
 
     outputs =
       Enum.map(Map.keys(state.output_tensors), fn tensor_name ->
         # Helper.make_tensor_value_info(tensor_name, {:f, 32}, [1] ++ state.output_tensors[tensor_name])
-        Helper.make_tensor_value_info(tensor_name, 1, [1] ++ state.output_tensors[tensor_name])
+        Helper.make_tensor_value_info(tensor_name, 1, Utils.cfl(state.batch_size, state.output_tensors[tensor_name]))
       end)
 
+    [state, outputs]
     DarknetToOnnx.WeightLoader.start_link(weights_file: weights_file_path)
     [initializer, inputs] = make_initializer_inputs(state)
     DarknetToOnnx.WeightLoader.stop_link()
