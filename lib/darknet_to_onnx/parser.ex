@@ -4,7 +4,6 @@ defmodule DarknetToOnnx.ParseDarknet do
   """
 
   use Agent
-  require Logger
 
   @doc """
         Initializes a DarkNetParser object.
@@ -61,7 +60,7 @@ defmodule DarknetToOnnx.ParseDarknet do
 
       !String.match?(param_value_raw, ~r/^[[:alpha:]]+$/u) and String.match?(param_value_raw, ~r/\./) ->
         # It is a float number
-        [zero, decimali] = param_value_raw |> String.split(".")
+        [zero, _] = param_value_raw |> String.split(".")
 
         if zero === "" do
           [param_type, String.to_float("0" <> param_value_raw)]
@@ -84,30 +83,6 @@ defmodule DarknetToOnnx.ParseDarknet do
         Keyword argument:
         cfg_file_path
   """
-  def old_parse_cfg_file(state, cfg_file_path) do
-    # TODO: Add checks on file parsing
-    {:ok, parse_result} = ConfigParser.parse_file(cfg_file_path)
-    keys = Map.keys(parse_result)
-    # Adding the type keyword... That's just for learning. The type can ne obtained on the fly with a match
-    # like: { _, type } = String.split(key, "_")
-    parse_result =
-      DarknetToOnnx.Learning.update_map(parse_result, fn state, k, v ->
-        # [_ptype, pvalue]=parse_params(state, state[k])
-        # IO.puts("STATE K=" <> inspect(state[k]))
-
-        Enum.map(state[k], fn {k, v} ->
-          # IO.puts("CHIAMO parse_param CON: " <> inspect({k, v}))
-          [_ptype, pvalue] = parse_params({k, v})
-          {k, pvalue}
-        end)
-        |> Map.new()
-      end)
-
-    parse_result = DarknetToOnnx.Learning.update_map_adding_type(parse_result)
-    # IO.puts("Qui parse_result=" <> inspect(parse_result))
-    %{state | :parse_result => parse_result, :keys => keys}
-  end
-
   def parse_cfg_file(state, cfg_file_path) do
     {:ok, parse_result} = ConfigParser.parse_file(cfg_file_path)
 
@@ -138,11 +113,10 @@ defmodule DarknetToOnnx.ParseDarknet do
     upsample_count = Enum.count(upsamples)
 
     try do
-      yolo_count in [2, 3, 4]
-      upsample_count == yolo_count - 1 or upsample_count == 0
+      (yolo_count in [2, 3, 4] and upsample_count == yolo_count - 1) or upsample_count == 0
     rescue
       e ->
-        Logger.error(Exception.format(:error, e, __STACKTRACE__))
+        #  Logger.error(Exception.format(:error, e, __STACKTRACE__))
         nil
     end
 

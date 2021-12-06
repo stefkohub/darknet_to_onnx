@@ -4,7 +4,6 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
   """
 
   use Agent
-  require Logger
 
   alias DarknetToOnnx.Learning, as: Utils
   alias DarknetToOnnx.Helper, as: Helper
@@ -197,6 +196,7 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
     strides = [layer_dict["stride"], layer_dict["stride"]]
     dilations = [1, 1]
     weights_name = DarknetToOnnx.ConvParams.generate_param_name(conv_params_state, "conv", "weights")
+
     inputs =
       if conv_params_state.batch_normalize != True do
         Utils.cfl([], [
@@ -219,6 +219,7 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
     state = %{state | nodes: Utils.cfl(state.nodes, conv_node)}
     layer_name_output = layer_name
     inputs = [layer_name]
+
     [state, layer_name_output, inputs] =
       if conv_params_state.batch_normalize == True do
         new_nodes = make_conv_node_batch_normalize(state, inputs, conv_params_state, layer_name)
@@ -373,6 +374,7 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
     channels = 0
     layers = layer_dict["layers"]
     [inputs, channels] = inner_make_route_node_recursive(state, inputs, channels, layers)
+
     [
       %{
         state

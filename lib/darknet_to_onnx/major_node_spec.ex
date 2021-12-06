@@ -7,5 +7,4 @@ defmodule DarknetToOnnx.MajorNodeSpecs do
   """
 
   use Agent
-  require Logger
 end

@@ -11,7 +11,7 @@ defmodule DarknetToOnnx.Helper do
   alias DarknetToOnnx.Learning, as: Utils
   alias Onnx.ModelProto, as: Model
   alias Onnx.GraphProto, as: Graph
-  alias Onnx.NodeProto, as: Node
+  #  alias Onnx.NodeProto, as: Node
   alias Onnx.ValueInfoProto, as: Value
   alias Onnx.AttributeProto, as: Attribute
   alias Onnx.OperatorSetIdProto, as: Opset
@@ -56,9 +56,7 @@ defmodule DarknetToOnnx.Helper do
   end
 
   def make_tensor_type_proto(elem_type, shape, shape_denotation \\ []) do
-    tensor_shape_proto = %Shape{dim: %Dimension{}}
-
-    type_proto = %Type{
+    %Type{
       value:
         {:tensor_type,
          %TensorTypeProto{
@@ -209,7 +207,7 @@ defmodule DarknetToOnnx.Helper do
     end)
   end
 
-  def save_model(proto, f) do
+  def save_model(proto, _f) do
     encoded_model = Onnx.ModelProto.encode!(proto)
     {:ok, file} = File.open(@output_file_name, [:write])
     IO.binwrite(file, encoded_model)

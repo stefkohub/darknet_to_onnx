@@ -6,7 +6,6 @@ defmodule DarknetToOnnx.WeightLoader do
   """
 
   use Agent, restart: :temporary
-  require Logger
 
   alias DarknetToOnnx.Learning, as: Utils
   alias DarknetToOnnx.Helper, as: Helper
@@ -21,7 +20,7 @@ defmodule DarknetToOnnx.WeightLoader do
       weights_file: open_weights_file(Keyword.fetch!(opts, :weights_file))
     }
 
-    {:ok, pid} = Agent.start_link(fn -> initial_state end, name: __MODULE__)
+    {:ok, _pid} = Agent.start_link(fn -> initial_state end, name: __MODULE__)
     initial_state
   end
 
