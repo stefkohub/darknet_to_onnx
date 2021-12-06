@@ -84,7 +84,7 @@ defmodule DarknetToOnnx.ParseDarknet do
         cfg_file_path
   """
   def parse_cfg_file(state, cfg_file_path) do
-    {:ok, parse_result} = ConfigParser.parse_file(cfg_file_path)
+    {:ok, parse_result} = ConfigParser.parse_file(cfg_file_path, overwrite_sections: false)
 
     parse_result =
       Enum.map(parse_result, fn {name, datamap} ->
