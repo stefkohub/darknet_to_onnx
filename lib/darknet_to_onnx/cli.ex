@@ -46,13 +46,14 @@ defmodule DarknetToOnnx.CLI do
          ) do
       raise "Wrong model. It muse be one of: [yolov3-tiny|yolov3|yolov3-spp|yolov4-tiny|yolov4|yolov4-csp|yolov4x-mish]-{dimension}, where {dimension} could be either a single number (e.g. 288, 416, 608) or 2 numbers, WxH (e.g. 416x256)"
     else
-      if File.exists?(model<>".cfg") and File.exists?(model<>".weights") do
-        if File.exists?(model<>".onnx") do
-          IO.puts("Overwriting previous ONNX model file: "<>model<>".onnx")
+      if File.exists?(model <> ".cfg") and File.exists?(model <> ".weights") do
+        if File.exists?(model <> ".onnx") do
+          IO.puts("Overwriting previous ONNX model file: " <> model <> ".onnx")
         end
+
         DarknetToOnnx.darknet_to_onnx(model, model <> ".cfg", model <> ".weights", model <> ".onnx")
       else
-        raise "Model files doesn't exists: "<>model<>"[.cfg, .model]"
+        raise "Model files doesn't exists: " <> model <> "[.cfg, .model]"
       end
     end
   end
