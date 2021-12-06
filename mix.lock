@@ -1,7 +1,7 @@
 %{
   "axon": {:git, "https://github.com/elixir-nx/axon.git", "4487230250b78856a726dd222149bd44a3f863d0", []},
   "axon_onnx": {:git, "https://github.com/elixir-nx/axon_onnx", "45e10b27113b12cf31efe088cb710cc1bd6c5635", [tag: "master"]},
-  "configparser_ex": {:git, "https://github.com/stefkohub/configparser_ex", "77c5b59cd61bad6e43b4e4d4fc48e1af382a81e9", [tag: "master"]},
+  "configparser_ex": {:git, "https://github.com/stefkohub/configparser_ex", "74ac22d3dcbfb35cc51bfceb423f4f5f1706cc44", [tag: "master"]},
   "elixir_make": {:hex, :elixir_make, "0.6.3", "bc07d53221216838d79e03a8019d0839786703129599e9619f4ab74c8c096eac", [:mix], [], "hexpm", "f5cbd651c5678bcaabdbb7857658ee106b12509cd976c2c2fca99688e1daf716"},
   "exla": {:git, "https://github.com/elixir-nx/nx.git", "ec220954d76b02304db91d0437598e952b5db593", [sparse: "exla"]},
   "explorer": {:git, "https://github.com/elixir-nx/explorer.git", "65c56803666e94fe60e8b0a461104a6857096ac4", []},
