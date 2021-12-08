@@ -68,7 +68,6 @@ defmodule DarknetToOnnx.WeightLoader do
       case param_category do
         "bn" ->
           {channels_out}
-
         "conv" ->
           case suffix do
             "weights" -> {channels_out, channels_in, filter_h, filter_w}
@@ -78,14 +77,9 @@ defmodule DarknetToOnnx.WeightLoader do
 
     param_size = Enum.reduce(Tuple.to_list(param_shape), 1, fn val, acc -> acc * val end)
     %{weights_file: weights_file} = get_state()
-    # param_data = Nx.reshape(Nx.from_binary(IO.binread(weights_file, param_size*4), {:f, 32}), param_shape)
-    # param_data = Nx.from_binary(IO.binread(weights_file, param_size * 4), {:f, 32})
     param_data = IO.binread(weights_file, param_size * 4)
+    update_state(:weights_file, weights_file)
     [param_name, param_data, param_shape]
-    # TODO: Vedi righe 466-470
-    # Nx.reshape(Nx.from_binary(), shape)
-    # param_data = [Nx.from_binary(header, {:s, 32})
-    # TODO: Continue...
   end
 
   @doc """
@@ -99,10 +93,6 @@ defmodule DarknetToOnnx.WeightLoader do
   """
   def create_param_tensors(conv_params, param_category, suffix) do
     [param_name, param_data, param_data_shape] = load_one_param_type(conv_params, param_category, suffix)
-
-    # Nx.reshape(param_data, name: param_name)
-    # initializer_tensor = param_data
-    # input_tensor = []
 
     initializer_tensor =
       DarknetToOnnx.Helper.make_tensor(
@@ -130,7 +120,7 @@ defmodule DarknetToOnnx.WeightLoader do
   """
   def load_conv_weights(conv_params) do
     [init, input] =
-      if conv_params.batch_normalize != nil do
+      if conv_params.batch_normalize != nil and conv_params.batch_normalize == True do
         [bias_init, bias_input] = create_param_tensors(conv_params, "bn", "bias")
         [bn_scale_init, bn_scale_input] = create_param_tensors(conv_params, "bn", "scale")
         [bn_mean_init, bn_mean_input] = create_param_tensors(conv_params, "bn", "mean")
@@ -142,7 +132,6 @@ defmodule DarknetToOnnx.WeightLoader do
         ]
       else
         [bias_init, bias_input] = create_param_tensors(conv_params, "conv", "bias")
-
         [
           [bias_init],
           [bias_input]
@@ -161,11 +150,11 @@ defmodule DarknetToOnnx.WeightLoader do
   """
   def load_upsample_scales(upsample_params) do
     upsample_state = DarknetToOnnx.UpsampleParams.get_state(upsample_params.node_name)
+    name = DarknetToOnnx.UpsampleParams.generate_param_name(upsample_state)
 
     scale_init =
       Helper.make_tensor(
-        DarknetToOnnx.UpsampleParams.generate_param_name(upsample_state),
-        # {:f, 32},
+        name,
         1,
         upsample_state.value.shape,
         upsample_state.value.data.state
@@ -173,8 +162,7 @@ defmodule DarknetToOnnx.WeightLoader do
 
     scale_input =
       Helper.make_tensor_value_info(
-        DarknetToOnnx.UpsampleParams.generate_param_name(upsample_state),
-        # {:f, 32},
+        name,
         1,
         upsample_state.value.shape
       )

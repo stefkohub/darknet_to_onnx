@@ -207,9 +207,9 @@ defmodule DarknetToOnnx.Helper do
     end)
   end
 
-  def save_model(proto, _f) do
+  def save_model(proto, f) do
     encoded_model = Onnx.ModelProto.encode!(proto)
-    {:ok, file} = File.open(@output_file_name, [:write])
+    {:ok, file} = File.open(f, [:write])
     IO.binwrite(file, encoded_model)
     File.close(file)
   end
