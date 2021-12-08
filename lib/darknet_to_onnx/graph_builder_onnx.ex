@@ -261,6 +261,7 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
 
         "linear" ->
           [state, layer_name_output]
+
         _ ->
           raise "Unsupported layer_dict activation type: " <> inspect(layer_dict["activation"])
       end

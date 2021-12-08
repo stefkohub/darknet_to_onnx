@@ -68,6 +68,7 @@ defmodule DarknetToOnnx.WeightLoader do
       case param_category do
         "bn" ->
           {channels_out}
+
         "conv" ->
           case suffix do
             "weights" -> {channels_out, channels_in, filter_h, filter_w}
@@ -132,6 +133,7 @@ defmodule DarknetToOnnx.WeightLoader do
         ]
       else
         [bias_init, bias_input] = create_param_tensors(conv_params, "conv", "bias")
+
         [
           [bias_init],
           [bias_input]
