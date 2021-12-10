@@ -12,12 +12,12 @@ defmodule DarknetToOnnx do
   alias DarknetToOnnx.Helper, as: Helper
 
   def darknet_to_onnx(model, cfg_file_path, weights_file_path, output_path) do
-    {result, parser_pid} = DarknetToOnnx.ParseDarknet.start_link([cfg_file_path: cfg_file_path])
+    {result, parser_pid} = DarknetToOnnx.ParseDarknet.start_link(cfg_file_path: cfg_file_path)
 
     if result != :ok do
       {_msg_already_started, old_pid} = parser_pid
       Agent.stop(old_pid)
-      {:ok, _parser_pid} = DarknetToOnnx.ParseDarknet.start_link([cfg_file_path: cfg_file_path])
+      {:ok, _parser_pid} = DarknetToOnnx.ParseDarknet.start_link(cfg_file_path: cfg_file_path)
     end
 
     parser_state = DarknetToOnnx.ParseDarknet.get_state()

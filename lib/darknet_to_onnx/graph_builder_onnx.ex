@@ -496,7 +496,7 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
 
           [state, major_node_specs]
         else
-          raise "First node must be type net, got: "<>layer_type
+          raise "First node must be type net, got: " <> layer_type
         end
       else
         node_creators = %{
@@ -601,6 +601,5 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
     end
 
     Helper.make_model(state.graph_def, producer_name: "NVIDIA TensorRT sample")
-
   end
 end

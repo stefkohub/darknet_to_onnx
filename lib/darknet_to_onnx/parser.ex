@@ -90,8 +90,9 @@ defmodule DarknetToOnnx.ParseDarknet do
     parse_result =
       Enum.map(parse_result, fn {name, datamap} ->
         [_, new_type] = String.split(name, "_")
+
         if new_type not in state.supported_layers do
-          raise new_type<>" layer not supported!"
+          raise new_type <> " layer not supported!"
         end
 
         {name,
@@ -103,8 +104,8 @@ defmodule DarknetToOnnx.ParseDarknet do
       end)
       |> Map.new()
 
-    IO.puts ">>>> parse_result="<>inspect(parse_result)
-    %{state | :parse_result => parse_result, :keys => Map.keys(parse_result)|>Enum.sort}
+    IO.puts(">>>> parse_result=" <> inspect(parse_result))
+    %{state | :parse_result => parse_result, :keys => Map.keys(parse_result) |> Enum.sort()}
   end
 
   def get_state() do
