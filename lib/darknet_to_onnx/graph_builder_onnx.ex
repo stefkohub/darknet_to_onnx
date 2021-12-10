@@ -364,7 +364,6 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
   end
 
   def inner_make_route_node(state, layer_name, layer_dict, layer_dict_layers) when layer_dict_layers != 1 do
-    # TODO Check for "groups" NOT IN Map.keys(layer_dict)
     if "groups" in Map.keys(layer_dict) do
       raise "groups not implemented for multiple-input route layer!" <> inspect(Map.keys(layer_dict))
     end
@@ -497,7 +496,7 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
 
           [state, major_node_specs]
         else
-          raise "First node must be type net"
+          raise "First node must be type net, got: "<>layer_type
         end
       else
         node_creators = %{
@@ -557,8 +556,8 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
     end)
   end
 
-  def create_major_node_specs(state, layer_configs) do
-    Enum.reduce(Map.keys(layer_configs), {state, []}, fn layer_name, acc ->
+  def create_major_node_specs(state, layer_configs, layer_configs_keys) do
+    Enum.reduce(layer_configs_keys, {state, []}, fn layer_name, acc ->
       layer_dict = layer_configs[layer_name]
       {state, major_node_specs} = acc
       [state, new_major_node_specs] = make_onnx_node(state, layer_name, layer_dict)
@@ -567,8 +566,8 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
     end)
   end
 
-  def build_onnx_graph(state, layer_configs, weights_file_path, verbose \\ True) do
-    {state, major_node_specs} = create_major_node_specs(state, layer_configs)
+  def build_onnx_graph(state, layer_configs, layer_configs_keys, weights_file_path, verbose \\ True) do
+    {state, major_node_specs} = create_major_node_specs(state, layer_configs, layer_configs_keys)
 
     state = %{
       state
@@ -577,7 +576,6 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
 
     outputs =
       Enum.map(Map.keys(state.output_tensors), fn tensor_name ->
-        # Helper.make_tensor_value_info(tensor_name, {:f, 32}, [1] ++ state.output_tensors[tensor_name])
         Helper.make_tensor_value_info(tensor_name, 1, Utils.cfl(state.batch_size, state.output_tensors[tensor_name]))
       end)
 
@@ -604,7 +602,5 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
 
     Helper.make_model(state.graph_def, producer_name: "NVIDIA TensorRT sample")
 
-    # DEVO TOGLIERLO NON DEVE TORNARE STATE !!!!!!!! ##################
-    # state
   end
 end

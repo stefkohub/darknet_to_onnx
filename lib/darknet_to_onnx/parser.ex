@@ -14,13 +14,13 @@ defmodule DarknetToOnnx.ParseDarknet do
   def start_link(
         opts,
         args \\ [
-          'net',
-          'convolutional',
-          'maxpool',
-          'shortcut',
-          'route',
-          'upsample',
-          'yolo'
+          "net",
+          "convolutional",
+          "maxpool",
+          "shortcut",
+          "route",
+          "upsample",
+          "yolo"
         ]
       ) do
     cfg_file_path = Keyword.fetch!(opts, :cfg_file_path)
@@ -28,7 +28,8 @@ defmodule DarknetToOnnx.ParseDarknet do
     initial_state = %{
       parse_result: [],
       keys: [],
-      output_convs: []
+      output_convs: [],
+      supported_layers: args
     }
 
     Agent.start_link(fn -> parse_cfg_file(initial_state, cfg_file_path) end, name: __MODULE__)
@@ -89,6 +90,9 @@ defmodule DarknetToOnnx.ParseDarknet do
     parse_result =
       Enum.map(parse_result, fn {name, datamap} ->
         [_, new_type] = String.split(name, "_")
+        if new_type not in state.supported_layers do
+          raise new_type<>" layer not supported!"
+        end
 
         {name,
          (Enum.map(datamap, fn {k, v} ->
@@ -99,7 +103,8 @@ defmodule DarknetToOnnx.ParseDarknet do
       end)
       |> Map.new()
 
-    %{state | :parse_result => parse_result, :keys => Map.keys(parse_result)}
+    IO.puts ">>>> parse_result="<>inspect(parse_result)
+    %{state | :parse_result => parse_result, :keys => Map.keys(parse_result)|>Enum.sort}
   end
 
   def get_state() do
@@ -115,7 +120,7 @@ defmodule DarknetToOnnx.ParseDarknet do
     try do
       (yolo_count in [2, 3, 4] and upsample_count == yolo_count - 1) or upsample_count == 0
     rescue
-      e ->
+      _e ->
         #  Logger.error(Exception.format(:error, e, __STACKTRACE__))
         nil
     end
