@@ -70,8 +70,8 @@ defmodule DarknetToOnnx do
 
     IO.puts("============================================================")
     IO.puts("       Model name: " <> model.graph.name)
-    IO.puts("    Producer name: "<>model.producer_name)
-    IO.puts(" Producer version: "<>model.producer_version)
+    IO.puts("    Producer name: " <> model.producer_name)
+    IO.puts(" Producer version: " <> model.producer_version)
     IO.puts("     Output nodes: ")
 
     Enum.each(model.graph.output, fn o ->
@@ -91,6 +91,6 @@ defmodule DarknetToOnnx do
 
     Helper.save_model(model, output_path)
     IO.puts("Done.")
-    # model
+    model
   end
 end
