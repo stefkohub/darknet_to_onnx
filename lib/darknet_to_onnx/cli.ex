@@ -53,7 +53,7 @@ defmodule DarknetToOnnx.CLI do
 
         DarknetToOnnx.darknet_to_onnx(model, model <> ".cfg", model <> ".weights", model <> ".onnx")
       else
-        raise "Model files doesn't exists: " <> model <> "[.cfg, .model]"
+        raise "Model files doesn't exists: " <> model <> "[.cfg, .weights]"
       end
     end
   end

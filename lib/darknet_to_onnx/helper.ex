@@ -1,7 +1,7 @@
 defmodule DarknetToOnnx.Helper do
   @moduledoc """
     Helper class used for creating tensors
-    (ported from: https://github.com/onnx/onnx/blob/master/onnx/helper.py)
+    (partially ported from: https://github.com/onnx/onnx/blob/master/onnx/helper.py)
   """
 
   @onnx_opset_version 15

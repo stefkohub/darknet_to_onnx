@@ -312,34 +312,40 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
     if !layer_dict["activation"] === "linear" do
       raise "Wrong activation for shortcut node"
     end
+
     [state, first_node_specs] = get_previous_node_specs(state)
     [state, second_node_specs] = get_previous_node_specs(state, layer_dict["from"])
-    #if first_node_specs != second_node_specs do
+    # if first_node_specs != second_node_specs do
     #  raise "Wrong shortcut node configuration: "<>inspect([first_node_specs.name, second_node_specs.name])
-    #end
+    # end
 
-    [ 
+    [
       %{
         state
         | nodes:
             Utils.cfl(
               state.nodes,
               [
-                Helper.make_node("Add", 
-                  [first_node_specs.name, second_node_specs.name], 
-                  [layer_name], 
-                  layer_name)
+                Helper.make_node(
+                  "Add",
+                  [first_node_specs.name, second_node_specs.name],
+                  [layer_name],
+                  layer_name
+                )
               ]
             )
       },
       layer_name,
       first_node_specs.channels
     ]
-
   end
 
   def inner_make_route_node(state, layer_name, layer_dict, layer_dict_layers) when layer_dict_layers == 1 do
     if "groups" in Map.keys(layer_dict) do
+      if "group_id" not in Map.keys(layer_dict) do
+        raise "Wrong group layer. Missing group_id"
+      end
+
       index =
         if hd(layer_dict["layers"]) > 0 do
           hd(layer_dict["layers"]) + 1
@@ -349,6 +355,17 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
 
       [state, route_node_specs] = get_previous_node_specs(state, index)
       groups = layer_dict["groups"]
+      group_id = layer_dict["group_id"]
+
+      if group_id >= groups do
+        raise "Wrong groups and group_id in route node"
+      end
+
+      if rem(route_node_specs.channels, groups) != 0 do
+        raise "Wrong channels and groups number in route node"
+      end
+
+      channels = div(route_node_specs.channels, groups)
 
       [
         %{
@@ -359,8 +376,8 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
                 Helper.make_node(
                   "Split",
                   [route_node_specs.name],
-                  for nn <- 0..groups, into: [] do
-                    if nn == groups do
+                  for nn <- 0..(groups - 1), into: [] do
+                    if nn == group_id do
                       layer_name
                     else
                       layer_name <> "_dummy" <> Integer.to_string(nn)
@@ -369,13 +386,13 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
                   layer_name,
                   %{
                     axis: 1,
-                    split: [route_node_specs.channels] |> List.duplicate(groups) |> List.flatten()
+                    split: [channels] |> List.duplicate(groups) |> List.flatten()
                   }
                 )
               )
         },
         layer_name,
-        div(route_node_specs.channels, groups)
+        channels
       ]
     else
       # if there is no "groups" into the layer_dict
@@ -402,11 +419,18 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
       raise "groups not implemented for multiple-input route layer!" <> inspect(Map.keys(layer_dict))
     end
 
-    # Puoi mettere i valori direttamente nella chiamata alla funzione togliendo assegnazioni inutili
-    inputs = []
-    channels = 0
     layers = layer_dict["layers"]
-    [inputs, channels] = inner_make_route_node_recursive(state, inputs, channels, layers)
+    %{inputs: inputs, channels: channels} =
+      layers
+      |> Enum.reduce(%{inputs: [], channels: 0}, fn index, acc ->
+        index = (index > 0 && index + 1) || index
+        [_state, previous_node_specs] = get_previous_node_specs(state, index)
+        %{
+          acc 
+          | inputs: Utils.cfl(acc.inputs, previous_node_specs.name),
+            channels: acc.channels + previous_node_specs.channels
+        }
+      end)
 
     [
       %{
@@ -422,26 +446,6 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
     ]
   end
 
-  def inner_make_route_node_recursive(_state, inputs, channels, []) do
-    [inputs, channels]
-  end
-
-  def inner_make_route_node_recursive(state, inputs, channels, layers) do
-    index = hd(layers)
-
-    index =
-      if index > 0 do
-        index + 1
-      else
-        index
-      end
-
-    [state, previous_node_specs] = get_previous_node_specs(state, index)
-    inputs = Utils.cfl(inputs, previous_node_specs.name)
-    channels = channels + previous_node_specs.channels
-    inner_make_route_node_recursive(state, inputs, channels, tl(layers))
-  end
-
   @doc """
         If the 'layers' parameter from the DarkNet configuration is only one index, continue
         node creation at the indicated (negative) index. Otherwise, create an ONNX Concat node
@@ -451,8 +455,8 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
         layer_dict -- a layer parameter dictionary (one element of layer_configs)
   """
   def make_route_node(state, layer_name, layer_dict) do
-    [state, layer_name, channels] = inner_make_route_node(state, layer_name, layer_dict, Enum.count(layer_dict["layers"]))
-    [state, layer_name, channels]
+    inner_make_route_node(state, layer_name, layer_dict, Enum.count(layer_dict["layers"]))
+    # [state, layer_name, channels]
   end
 
   @doc """
@@ -567,9 +571,8 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
         verbose -- toggles if the graph is printed after creation (default: True)
   """
   def make_initializer_inputs(state) do
-    IO.puts ">>> PARAM DICT == "<>inspect(state.param_dict)
     Enum.map(state.param_dict, fn data ->
-      [layer_name]=Map.keys(data)
+      [layer_name] = Map.keys(data)
       [_, layer_type] = String.split(layer_name, "_")
       params = data[layer_name]
 
@@ -594,7 +597,8 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
 
   def create_major_node_specs(state, layer_configs, layer_configs_keys) do
     Enum.reduce(layer_configs_keys, {state, []}, fn layer_name, acc ->
-      %{ name: _, data: layer_dict } = Enum.find(layer_configs, fn x -> x.name === layer_name end) # layer_configs[layer_name]
+      # layer_configs[layer_name]
+      %{name: _, data: layer_dict} = Enum.find(layer_configs, fn x -> x.name === layer_name end)
       {state, major_node_specs} = acc
       [state, new_major_node_specs] = make_onnx_node(state, layer_name, layer_dict)
       state = %{state | major_node_specs: Utils.cfl(major_node_specs, new_major_node_specs)}
