@@ -41,7 +41,7 @@ defmodule DarknetToOnnx do
         output_tensor_shapes
       end
 
-    output_tensor_dims = Map.new(Enum.zip(output_tensor_names, output_tensor_shapes))
+    output_tensor_dims = Enum.zip(output_tensor_names, output_tensor_shapes)
 
     IO.puts("Building ONNX graph...")
 

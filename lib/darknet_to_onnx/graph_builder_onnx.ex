@@ -37,7 +37,7 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
       epsilon_bn: 1.0e-5,
       momentum_bn: 0.99,
       alpha_lrelu: 0.1,
-      param_dict: %{},
+      param_dict: [],
       major_node_specs: [],
       batch_size: Keyword.fetch!(opts, :batch_size),
       route_spec: 0
@@ -266,7 +266,7 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
           raise "Unsupported layer_dict activation type: " <> inspect(layer_dict["activation"])
       end
 
-    state = %{state | param_dict: Map.merge(state.param_dict, %{layer_name => conv_params_state})}
+    state = %{state | param_dict: Utils.cfl(state.param_dict, %{layer_name => conv_params_state})}
     [state, layer_name_output, layer_dict["filters"]]
   end
 
@@ -300,8 +300,42 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
     ]
   end
 
-  def make_shortcut_node(state, _layer_name, _layer_dict) do
-    [state, "shortcut", 2]
+  @doc """
+        Create an ONNX Add node with the shortcut properties from
+        the DarkNet-based graph.
+        Keyword arguments:
+        layer_name -- the layer's name (also the corresponding key in layer_configs)
+        layer_dict -- a layer parameter dictionary (one element of layer_configs)
+
+  """
+  def make_shortcut_node(state, layer_name, layer_dict) do
+    if !layer_dict["activation"] === "linear" do
+      raise "Wrong activation for shortcut node"
+    end
+    [state, first_node_specs] = get_previous_node_specs(state)
+    [state, second_node_specs] = get_previous_node_specs(state, layer_dict["from"])
+    #if first_node_specs != second_node_specs do
+    #  raise "Wrong shortcut node configuration: "<>inspect([first_node_specs.name, second_node_specs.name])
+    #end
+
+    [ 
+      %{
+        state
+        | nodes:
+            Utils.cfl(
+              state.nodes,
+              [
+                Helper.make_node("Add", 
+                  [first_node_specs.name, second_node_specs.name], 
+                  [layer_name], 
+                  layer_name)
+              ]
+            )
+      },
+      layer_name,
+      first_node_specs.channels
+    ]
+
   end
 
   def inner_make_route_node(state, layer_name, layer_dict, layer_dict_layers) when layer_dict_layers == 1 do
@@ -449,7 +483,7 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
               state.nodes,
               Helper.make_node("Upsample", inputs, [layer_name], layer_name, %{mode: "nearest"})
             ),
-          param_dict: Map.merge(state.param_dict, %{layer_name => upsample_params})
+          param_dict: Utils.cfl(state.param_dict, %{layer_name => upsample_params})
       },
       layer_name,
       previous_node_specs.channels
@@ -533,9 +567,11 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
         verbose -- toggles if the graph is printed after creation (default: True)
   """
   def make_initializer_inputs(state) do
-    Enum.map(Map.keys(state.param_dict), fn layer_name ->
+    IO.puts ">>> PARAM DICT == "<>inspect(state.param_dict)
+    Enum.map(state.param_dict, fn data ->
+      [layer_name]=Map.keys(data)
       [_, layer_type] = String.split(layer_name, "_")
-      params = state.param_dict[layer_name]
+      params = data[layer_name]
 
       case layer_type do
         "convolutional" ->
@@ -558,7 +594,7 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
 
   def create_major_node_specs(state, layer_configs, layer_configs_keys) do
     Enum.reduce(layer_configs_keys, {state, []}, fn layer_name, acc ->
-      layer_dict = layer_configs[layer_name]
+      %{ name: _, data: layer_dict } = Enum.find(layer_configs, fn x -> x.name === layer_name end) # layer_configs[layer_name]
       {state, major_node_specs} = acc
       [state, new_major_node_specs] = make_onnx_node(state, layer_name, layer_dict)
       state = %{state | major_node_specs: Utils.cfl(major_node_specs, new_major_node_specs)}
@@ -575,8 +611,8 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
     }
 
     outputs =
-      Enum.map(Map.keys(state.output_tensors), fn tensor_name ->
-        Helper.make_tensor_value_info(tensor_name, 1, Utils.cfl(state.batch_size, state.output_tensors[tensor_name]))
+      Enum.map(state.output_tensors, fn {tensor_name, tensor_data} ->
+        Helper.make_tensor_value_info(tensor_name, 1, Utils.cfl(state.batch_size, tensor_data))
       end)
 
     [state, outputs]
