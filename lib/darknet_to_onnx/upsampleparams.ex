@@ -3,6 +3,8 @@ defmodule DarknetToOnnx.UpsampleParams do
     Helper class to store the scale parameter for an Upsample node.
   """
 
+  use Agent, restart: :transient
+
   @doc """
         Constructor based on the base node name (e.g. 86_Upsample),
         and the value of the scale input tensor.

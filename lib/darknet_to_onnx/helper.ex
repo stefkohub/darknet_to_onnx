@@ -3,6 +3,7 @@ defmodule DarknetToOnnx.Helper do
     Helper class used for creating tensors
     (partially ported from: https://github.com/onnx/onnx/blob/master/onnx/helper.py)
   """
+  use Agent, restart: :transient
 
   @onnx_opset_version 15
   @onnx_ir_version 8

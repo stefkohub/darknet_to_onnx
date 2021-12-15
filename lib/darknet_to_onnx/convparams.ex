@@ -6,6 +6,7 @@ defmodule DarknetToOnnx.ConvParams do
     Additionally acts as a wrapper for generating safe names for all
     weights, checking on feasible combinations.
   """
+  use Agent, restart: :transient
 
   @doc """
         Constructor based on the base node name (e.g. 101_convolutional), the batch

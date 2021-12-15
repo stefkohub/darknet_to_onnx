@@ -5,7 +5,7 @@ defmodule DarknetToOnnx.WeightLoader do
     the ONNX graph with weights.
   """
 
-  use Agent, restart: :temporary
+  use Agent, restart: :transient
 
   alias DarknetToOnnx.Learning, as: Utils
   alias DarknetToOnnx.Helper, as: Helper
@@ -79,9 +79,11 @@ defmodule DarknetToOnnx.WeightLoader do
     param_size = Enum.reduce(Tuple.to_list(param_shape), 1, fn val, acc -> acc * val end)
     %{weights_file: weights_file} = get_state()
     param_data = IO.binread(weights_file, param_size * 4)
+
     if param_data == :eof do
       raise "Reached end of file during weights loading. Maybe the file is corrupt?"
     end
+
     update_state(:weights_file, weights_file)
     [param_name, param_data, param_shape]
   end

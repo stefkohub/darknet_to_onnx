@@ -3,7 +3,7 @@ defmodule DarknetToOnnx.ParseDarknet do
   The Darknet parser (from: https://github.com/jkjung-avt/tensorrt_demos/blob/master/yolo/yolo_to_onnx.py)
   """
 
-  use Agent
+  use Agent, restart: :transient
 
   @doc """
         Initializes a DarkNetParser object.
@@ -44,6 +44,7 @@ defmodule DarknetToOnnx.ParseDarknet do
   def parse_params(params, skip_params \\ ["steps", "scales", "mask"]) do
     {param_type, param_value_raw} = params
     param_value_raw = param_value_raw |> String.replace(~r/\s+/, "")
+
     cond do
       skip_params != nil and param_type in skip_params ->
         [nil, param_value_raw]
@@ -84,7 +85,8 @@ defmodule DarknetToOnnx.ParseDarknet do
   def parse_cfg_file(state, cfg_file_path) do
     {:ok, parse_result} = ConfigParser.parse_file(cfg_file_path, overwrite_sections: false)
 
-    keys = Map.keys(parse_result)|>Enum.sort()
+    keys = Map.keys(parse_result) |> Enum.sort()
+
     parse_result =
       Enum.map(parse_result, fn {name, datamap} ->
         [_, new_type] = String.split(name, "_")
@@ -93,17 +95,20 @@ defmodule DarknetToOnnx.ParseDarknet do
           raise new_type <> " layer not supported!"
         end
 
-        %{:name => name,
-          :data => (Enum.map(datamap, fn {k, v} ->
-            [_ptype, pvalue] = DarknetToOnnx.ParseDarknet.parse_params({k, v})
-            {k, pvalue}
-          end) ++ [{"type", new_type}])
-         |> Map.new()}
+        %{
+          :name => name,
+          :data =>
+            (Enum.map(datamap, fn {k, v} ->
+               [_ptype, pvalue] = DarknetToOnnx.ParseDarknet.parse_params({k, v})
+               {k, pvalue}
+             end) ++ [{"type", new_type}])
+            |> Map.new()
+        }
       end)
-      |> Enum.sort_by(&(&1.name))
-      # |> Enum.sort_by(fn e -> e.name end)
+      |> Enum.sort_by(& &1.name)
 
-    IO.puts(">>>> parse_result=" <> inspect(parse_result))
+    # |> Enum.sort_by(fn e -> e.name end)
+
     %{state | :parse_result => parse_result, :keys => keys}
   end
 
@@ -160,7 +165,8 @@ defmodule DarknetToOnnx.ParseDarknet do
       previous_layer = layer_to_find <> "_convolutional"
 
       if Enum.member?(state.keys, previous_layer) do
-        %{name: _, data: %{ "activation" => activation}} = Enum.at(state.parse_result, String.to_integer(layer_to_find))
+        %{name: _, data: %{"activation" => activation}} = Enum.at(state.parse_result, String.to_integer(layer_to_find))
+
         case activation do
           "linear" -> previous_layer
           "logistic" -> previous_layer <> "_lgx"
@@ -176,7 +182,7 @@ defmodule DarknetToOnnx.ParseDarknet do
     Find number of output classes of the yolo model.
   """
   def get_category_num(state) do
-    %{ data: %{ "classes" => classes }, name: _} = Enum.find(state.parse_result, fn x -> x.data["classes"] end)
+    %{data: %{"classes" => classes}, name: _} = Enum.find(state.parse_result, fn x -> x.data["classes"] end)
     classes
   end
 
@@ -184,7 +190,7 @@ defmodule DarknetToOnnx.ParseDarknet do
   Find input height and width of the yolo model from layer configs.
   """
   def get_h_and_w(state) do
-    %{ data: %{ "height" => h, "width" => w }, name: _} = Enum.find(state.parse_result, fn x -> x.name == "000_net" end)
-    [ h, w ]
+    %{data: %{"height" => h, "width" => w}, name: _} = Enum.find(state.parse_result, fn x -> x.name == "000_net" end)
+    [h, w]
   end
 end

@@ -2,6 +2,7 @@ defmodule DarknetToOnnx do
   @moduledoc """
   Documentation for `DarknetToOnnx`.
   """
+  use Agent, restart: :transient
 
   @max_batch_size 1
   # @model "yolov3-tiny-416"
@@ -9,23 +10,25 @@ defmodule DarknetToOnnx do
   # @cfg_file_path "../yolov3-tiny-416.cfg"
   # @output_path "yolov3-tiny-416.onnx"
 
-  alias DarknetToOnnx.Helper, as: Helper
+  alias DarknetToOnnx.Helper
+  alias DarknetToOnnx.ParseDarknet
+  alias DarknetToOnnx.GraphBuilderONNX
 
   def darknet_to_onnx(model, cfg_file_path, weights_file_path, output_path) do
-    {result, parser_pid} = DarknetToOnnx.ParseDarknet.start_link(cfg_file_path: cfg_file_path)
+    {result, parser_pid} = ParseDarknet.start_link(cfg_file_path: cfg_file_path)
 
     if result != :ok do
       {_msg_already_started, old_pid} = parser_pid
       Agent.stop(old_pid)
-      {:ok, _parser_pid} = DarknetToOnnx.ParseDarknet.start_link(cfg_file_path: cfg_file_path)
+      {:ok, _parser_pid} = ParseDarknet.start_link(cfg_file_path: cfg_file_path)
     end
 
-    parser_state = DarknetToOnnx.ParseDarknet.get_state()
+    parser_state = ParseDarknet.get_state()
     %{parse_result: layer_configs, keys: layer_configs_keys} = parser_state
-    output_tensor_names = DarknetToOnnx.ParseDarknet.get_output_convs(parser_state)
-    category_num = DarknetToOnnx.ParseDarknet.get_category_num(parser_state)
+    output_tensor_names = ParseDarknet.get_output_convs(parser_state)
+    category_num = ParseDarknet.get_category_num(parser_state)
     c = (category_num + 5) * 3
-    [h, w] = DarknetToOnnx.ParseDarknet.get_h_and_w(parser_state)
+    [h, w] = ParseDarknet.get_h_and_w(parser_state)
 
     output_tensor_shapes =
       case Enum.count(output_tensor_names) do
@@ -35,7 +38,7 @@ defmodule DarknetToOnnx do
       end
 
     output_tensor_shapes =
-      if DarknetToOnnx.ParseDarknet.is_pan_arch?(parser_state) do
+      if ParseDarknet.is_pan_arch?(parser_state) do
         Enum.reverse(output_tensor_shapes)
       else
         output_tensor_shapes
@@ -45,21 +48,19 @@ defmodule DarknetToOnnx do
 
     IO.puts("Building ONNX graph...")
 
-    {result, gb_pid} =
-      DarknetToOnnx.GraphBuilderONNX.start_link(model_name: model, output_tensors: output_tensor_dims, batch_size: @max_batch_size)
+    {result, gb_pid} = GraphBuilderONNX.start_link(model_name: model, output_tensors: output_tensor_dims, batch_size: @max_batch_size)
 
     if result != :ok do
       {_msg_already_started, old_pid} = gb_pid
       Agent.stop(old_pid)
 
-      {:ok, _gb_pid} =
-        DarknetToOnnx.GraphBuilderONNX.start_link(model_name: model, output_tensors: output_tensor_dims, batch_size: @max_batch_size)
+      {:ok, _gb_pid} = GraphBuilderONNX.start_link(model_name: model, output_tensors: output_tensor_dims, batch_size: @max_batch_size)
     end
 
-    builder = DarknetToOnnx.GraphBuilderONNX.get_state(gb_pid)
+    builder = GraphBuilderONNX.get_state(gb_pid)
 
-    yolo_model_def =
-      DarknetToOnnx.GraphBuilderONNX.build_onnx_graph(
+    model =
+      GraphBuilderONNX.build_onnx_graph(
         builder,
         layer_configs,
         layer_configs_keys,
@@ -67,9 +68,29 @@ defmodule DarknetToOnnx do
         True
       )
 
+    IO.puts("============================================================")
+    IO.puts("       Model name: " <> model.graph.name)
+    IO.puts("    Producer name: "<>model.producer_name)
+    IO.puts(" Producer version: "<>model.producer_version)
+    IO.puts("     Output nodes: ")
+
+    Enum.each(model.graph.output, fn o ->
+      {_, t} = o.type.value
+
+      dims =
+        for d <- t.shape.dim do
+          {_, v} = d.value
+          v
+        end
+
+      IO.puts("        " <> o.name <> " " <> inspect(dims))
+    end)
+
+    IO.puts("============================================================")
     IO.puts("Saving ONNX file...")
 
-    Helper.save_model(yolo_model_def, output_path)
-    yolo_model_def
+    Helper.save_model(model, output_path)
+    IO.puts("Done.")
+    # model
   end
 end

@@ -3,7 +3,7 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
       Class for creating an ONNX graph from a previously generated list of layer dictionaries.
   """
 
-  use Agent
+  use Agent, restart: :transient
 
   alias DarknetToOnnx.Learning, as: Utils
   alias DarknetToOnnx.Helper, as: Helper
@@ -420,13 +420,15 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
     end
 
     layers = layer_dict["layers"]
+
     %{inputs: inputs, channels: channels} =
       layers
       |> Enum.reduce(%{inputs: [], channels: 0}, fn index, acc ->
         index = (index > 0 && index + 1) || index
         [_state, previous_node_specs] = get_previous_node_specs(state, index)
+
         %{
-          acc 
+          acc
           | inputs: Utils.cfl(acc.inputs, previous_node_specs.name),
             channels: acc.channels + previous_node_specs.channels
         }
@@ -640,6 +642,6 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
       Helper.printable_graph(state.graph_def)
     end
 
-    Helper.make_model(state.graph_def, producer_name: "NVIDIA TensorRT sample")
+    Helper.make_model(state.graph_def, producer_name: "Elixir Nx Example")
   end
 end
