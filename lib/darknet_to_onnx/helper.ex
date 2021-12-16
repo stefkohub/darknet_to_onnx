@@ -7,7 +7,6 @@ defmodule DarknetToOnnx.Helper do
 
   @onnx_opset_version 15
   @onnx_ir_version 8
-  @output_file_name "yolov3-tiny-416-SF.onnx"
 
   alias DarknetToOnnx.Learning, as: Utils
   alias Onnx.ModelProto, as: Model
@@ -145,67 +144,17 @@ defmodule DarknetToOnnx.Helper do
     }
   end
 
-  def printable_graph(graph, prefix \\ "") do
-    indent = prefix <> "  "
-    header = ["graph", graph.name]
-    # initializers = 
-  end
+  def printable_graph(graph) do
+    IO.puts("============================================================")
+    IO.puts("            Graph: " <> graph.name)
+    IO.puts("     Output nodes: ")
 
-  def get_all_tensors(model) do
-    #  TODO:, attributes from model.graph.node
-    model.graph.initializer
-  end
-
-  def set_external_data(tensor, location, offset \\ nil, length \\ nil, checksum \\ nil, basepath \\ nil) do
-    if !Map.has_key?(tensor, "raw_data") do
-      raise "raw_data field doesn't exist."
-    end
-
-    %{
-      tensor
-      | data_location: :EXTERNAL,
-        external_data:
-          Utils.cfl(tensor.external_data, [
-            %{
-              "location" => location,
-              "offset" => offset,
-              "length" => length,
-              "checksum" => checksum,
-              "basepath" => basepath
-            }
-          ])
-    }
-  end
-
-  def save_external_data(tensor, filepath) do
-    info = ExternalDataInfo.start_link(tensor)
-    external_data_file_path = Path.join(filepath, info.location)
-
-    if !Map.has_key?(tensor, "raw_data") do
-      raise "raw_data field doesn't exist."
-    end
-
-    {:ok, data_file} = File.open(external_data_file_path, [:binary, :write])
-    # TODO: Should ensure appending to the file
-    # TODO: if info.offset ....
-    IO.binwrite(data_file, tensor.raw_data.data.state)
-    # return a new tensor
-    File.close(data_file)
-    {:ok, %{size: offset}} = File.stat!(external_data_file_path)
-    set_external_data(tensor, info.location, offset, byte_size(tensor.raw_data.data.state))
-  end
-
-  def uses_external_data(tensor) do
-    Map.has_key?(tensor, "data_location") and tensor.data_location == :EXTERNAL
-  end
-
-  def write_external_data_tensors(model, filepath) do
-    Enum.each(get_all_tensors(model), fn tensor ->
-      if uses_external_data(tensor) do
-        save_external_data(tensor, filepath)
-        # TODO: tensor.ClearField("raw_data")
-      end
+    Enum.each(graph.output, fn o ->
+      dims = for d <- elem(o.type.value, 1).shape.dim, do: elem(d.value, 1)
+      IO.puts("        " <> o.name <> " " <> inspect(dims))
     end)
+
+    IO.puts("============================================================")
   end
 
   def save_model(proto, f) do
@@ -235,11 +184,7 @@ defmodule DarknetToOnnx.Helper do
       val.__struct__ === Onnx.TypeProto
   end
 
-  def inner_make_attribute(key, val) do
-    newAttr = %Attribute{
-      name: Atom.to_string(key)
-    }
-
+  def create_attribute_map(key, val) do
     to_add =
       cond do
         is_float(val) ->
@@ -286,7 +231,12 @@ defmodule DarknetToOnnx.Helper do
           %{type_protos: val, type: :TYPE_PROTOS}
       end
 
-    Map.merge(newAttr, to_add)
+    Map.merge(
+      %Attribute{
+        name: Atom.to_string(key)
+      },
+      to_add
+    )
   end
 
   def make_attribute(kwargs) do
@@ -294,7 +244,7 @@ defmodule DarknetToOnnx.Helper do
 
     sortedargs
     |> Enum.reduce([], fn {key, val}, acc ->
-      [inner_make_attribute(key, val) | acc]
+      [create_attribute_map(key, val) | acc]
     end)
   end
 

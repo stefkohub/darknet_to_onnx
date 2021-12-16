@@ -68,27 +68,6 @@ defmodule DarknetToOnnx do
         True
       )
 
-    IO.puts("============================================================")
-    IO.puts("       Model name: " <> model.graph.name)
-    IO.puts("    Producer name: " <> model.producer_name)
-    IO.puts(" Producer version: " <> model.producer_version)
-    IO.puts("     Output nodes: ")
-
-    Enum.each(model.graph.output, fn o ->
-      {_, t} = o.type.value
-
-      dims =
-        for d <- t.shape.dim do
-          {_, v} = d.value
-          v
-        end
-
-      IO.puts("        " <> o.name <> " " <> inspect(dims))
-    end)
-
-    IO.puts("============================================================")
-    IO.puts("Saving ONNX file...")
-
     Helper.save_model(model, output_path)
     IO.puts("Done.")
     model

@@ -29,7 +29,7 @@ defmodule DarknetToOnnx.MixProject do
       # {:configparser_ex, git: "https://github.com/stefkohub/configparser_ex", tag: "master"},
       {:configparser_ex, github: "stefkohub/configparser_ex", tag: "master"},
       {:axon, "~> 0.1.0-dev", github: "elixir-nx/axon"},
-      {:axon_onnx, git: "https://github.com/elixir-nx/axon_onnx", tag: "master"},
+      {:axon_onnx, github: "stefkohub/axon_onnx", tag: "master"},
       {:exla, "~> 0.1.0-dev", github: "elixir-nx/nx", sparse: "exla"},
       # {:torchx, "~> 0.1.0-dev", github: "elixir-nx/nx", sparse: "torchx"},
       {:nx, "~> 0.1.0-dev", github: "elixir-nx/nx", sparse: "nx", override: true}
