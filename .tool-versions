@@ -5,3 +5,4 @@
 # to get going quickly.
 elixir 1.12.3-otp-24
 erlang 24.1
+protoc 3.19.1

@@ -26,8 +26,7 @@ defmodule DarknetToOnnx.MixProject do
       # {:dep_from_hexpm, "~> 0.3.0"},
       # {:dep_from_git, git: "https://github.com/elixir-lang/my_dep.git", tag: "0.1.0"}
       # {:configparser_ex, git: "https://github.com/easco/configparser_ex", tag: "master"},
-      # {:configparser_ex, git: "https://github.com/stefkohub/configparser_ex", tag: "master"},
-      {:configparser_ex, github: "stefkohub/configparser_ex", tag: "master"},
+      {:configparser_ex, git: "https://github.com/stefkohub/configparser_ex", tag: "master"},
       {:axon, "~> 0.1.0-dev", github: "elixir-nx/axon"},
       {:axon_onnx, github: "stefkohub/axon_onnx", tag: "master"},
       {:exla, "~> 0.1.0-dev", github: "elixir-nx/nx", sparse: "exla"},
