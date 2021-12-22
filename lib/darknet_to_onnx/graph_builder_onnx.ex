@@ -376,12 +376,8 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
                 Helper.make_node(
                   "Split",
                   [route_node_specs.name],
-                  for nn <- 0..(groups - 1), into: [] do
-                    if nn == group_id do
-                      layer_name
-                    else
-                      layer_name <> "_dummy" <> Integer.to_string(nn)
-                    end
+                  for nn <- 0..(groups - 1) do
+                    nn == group_id && layer_name || layer_name <> "_dummy#{nn}"
                   end,
                   layer_name,
                   %{
