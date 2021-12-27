@@ -2,10 +2,10 @@
 
 This is a partial port of yolo_to_onnx from jkjung-avt/tensorrt_demos/tensorrt_demos/yolo.
 At the moment I tested it with:
- yolov3-tiny 
- yolov3 
- yolov4
- yolov4-tiny
+*  yolov3-tiny 
+*  yolov3 
+*  yolov4
+*  yolov4-tiny
 
 config and weights files.
 
