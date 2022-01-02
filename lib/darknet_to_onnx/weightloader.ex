@@ -78,10 +78,11 @@ defmodule DarknetToOnnx.WeightLoader do
 
     param_size = Enum.reduce(Tuple.to_list(param_shape), 1, fn val, acc -> acc * val end)
     %{weights_file: weights_file} = get_state()
-    param_data = IO.binread(weights_file, param_size * 4)
+    bin_data = IO.binread(weights_file, param_size * 4)
+    param_data = for <<data::float-32-native <- bin_data>>, do: data
 
     if param_data == :eof do
-      raise "Reached end of file during weights loading. Maybe the file is corrupt?"
+      raise "Reached end of file during weights loading. Is the file corrupt?"
     end
 
     update_state(:weights_file, weights_file)
@@ -164,7 +165,7 @@ defmodule DarknetToOnnx.WeightLoader do
         name,
         1,
         upsample_state.value.shape,
-        upsample_state.value.data.state
+        Nx.to_flat_list(upsample_state.value)
       )
 
     scale_input =
