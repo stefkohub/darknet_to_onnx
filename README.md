@@ -1,7 +1,13 @@
 # DarknetToOnnx
 
 This is a partial port of yolo_to_onnx from jkjung-avt/tensorrt_demos/tensorrt_demos/yolo.
-At the moment I tested it with yolov3-tiny and yolov3 models (cfg and weights files).
+At the moment I tested it with:
+*  yolov3-tiny 
+*  yolov3 
+*  yolov4
+*  yolov4-tiny
+
+config and weights files.
 
 ## Usage
 I have some problem in converting this app to escript. It seems there is some problem with axon library. I am still working on it.
@@ -15,7 +21,7 @@ The model name must be in the form: `<yolo_model>-<dimension>`.
 For more details on allowed parameters, please use:
 `mix run -e 'DarknetToOnnx.CLI.main(["-h"])'`
 
-The output will be a file with same `model_path_and_model_name` with onnx extension.
+The output will be a file with same `model_path_and_model_name.onnx`.
 
 ### Usage example
 ```bash
