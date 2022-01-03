@@ -10,6 +10,8 @@ defmodule HelperText do
   alias Onnx.TensorShapeProto.Dimension
   alias DarknetToOnnx.Helper
 
+  @cache_dir Path.join([File.cwd!(), ".test-cache"])
+
   describe "Creates new tensor" do
     test "Float 16 Tensor with {1,2,3} shape with bitcast to unsigned int" do
       assert %Placeholder{
@@ -124,18 +126,37 @@ defmodule HelperText do
     end 
   end
 
-  describe "Create new model" do
-    test "" do
-      node_def = Helper.make_node("Relu", ["X"], ["Y"])
-      graph_def = Helper.make_graph(
-        [node_def],
+  describe "Create and export new model" do
+    def create_graph() do
+      Helper.make_graph(
+        [Helper.make_node("Relu", ["X"], ["Y"])],
         "test",
         [Helper.make_tensor_value_info("X", :FLOAT, [1, 2])],
         [Helper.make_tensor_value_info("Y", :FLOAT, [1, 2])]
       )
+    end
+    test "Create new model" do
+      graph_def = create_graph()
       assert %Model{
         producer_name: "test"
       } = Helper.make_model(graph_def, [producer_name: "test"])
+    end
+
+    test "Save the new model and check if the file has been saved" do
+      model_name = "temporary_model_test"
+      cache_dir = Path.join([@cache_dir, model_name])
+      File.mkdir_p!(cache_dir)
+
+      model_path = Path.join([cache_dir, "#{model_name}.onnx"])
+      graph_def = create_graph()
+      model_def = %Model{
+        producer_name: "test"
+      } = Helper.make_model(graph_def, [producer_name: "test"])
+      assert :ok = Helper.save_model(model_def, model_path)
+      assert cache_dir
+        |> File.ls!()
+        |> Enum.find(fn x -> x === "#{model_name}.onnx" end)
+       assert File.rm!(model_path)
     end
   end
 
