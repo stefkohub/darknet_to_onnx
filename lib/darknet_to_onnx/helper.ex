@@ -21,17 +21,12 @@ defmodule DarknetToOnnx.Helper do
   alias Onnx.TensorShapeProto, as: Shape
   alias Onnx.TensorShapeProto.Dimension, as: Dimension
 
-  @doc """
-        Checks whether a variable is enumerable and not a struct
-  """
+  
+  # Checks whether a variable is enumerable and not a struct
   defp is_enum?(var) do
-    if is_list(var) or
-         (is_map(var) and not Map.has_key?(var, :__struct__)) or
-         is_tuple(var) do
-      True
-    else
-      False
-    end
+    is_list(var) or
+      (is_map(var) and not Map.has_key?(var, :__struct__)) or
+      is_tuple(var)
   end
 
   defp data_type_id_from_atom(data_type) when is_atom(data_type) do
@@ -42,40 +37,56 @@ defmodule DarknetToOnnx.Helper do
   end
 
   @doc """
+    Construct an OperatorSetIdProto.
+    Arguments:
+        domain (string): The domain of the operator set id
+        version (integer): Version of operator set id
+  """
+  def make_operatorsetid(domain, version) do
+    %Opset{
+      domain: domain,
+      version: version
+    }
+  end
+
+  defp parse_data_type(data_type) do
+    max_data_type_id = Enum.count(Placeholder.DataType.constants) - 1
+    parsed_data_type = cond do
+      is_atom(data_type) -> 
+        # Check for an existing type identified by the atom
+        data_type_id_from_atom(data_type)
+      is_number(data_type) && data_type < max_data_type_id -> 
+        # Check for an existing type identified by the number
+        Enum.fetch!(Placeholder.DataType.constants, data_type)
+      true ->
+        nil
+    end
+    if parsed_data_type == nil, do:
+      raise ArgumentError, "Wrong data_type format. Expected atom or number<#{max_data_type_id}, got: #{data_type}"
+    parsed_data_type
+  end
+
+  @doc """
     Make a TensorProto with specified arguments.  If raw is False, this
     function will choose the corresponding proto field to store the
     values based on data_type. If raw is True, use "raw_data" proto
     field to store the values, and values should be of type bytes in
     this case.
   """
-  def make_tensor(name, data_type, dims, vals, raw \\ False) do
-    {data_type_id, data_type_atom} =
-      cond do
-        is_atom(data_type) -> 
-          # Check for an existing type identified by the atom
-          data_type_id_from_atom(data_type)
-        is_number(data_type) -> 
-          # Check for an existing type identified by the number
-          Enum.fetch!(Placeholder.DataType.constants, data_type)
-        true ->
-          nil
-      end
+  def make_tensor(name, data_type, dims, vals, raw \\ false) do
+    {data_type_id, data_type_atom} = parse_data_type(data_type)
 
-    if data_type == nil, do:
-      raise ArgumentError, "Wrong data_type format. Expected atom or number, got: #{data_type}"
-
-    if data_type_id == 8 and raw == True, do:
+    if data_type_id == 8 and raw == true, do:
       raise ArgumentError, "Can not use raw_data to store string type"
 
     itemsize = Mapping.tensor_type_to_nx_type[data_type_atom]
     expected_size = raw == false && 1 || itemsize
     expected_size = Enum.reduce(Tuple.to_list(dims), expected_size, fn val, acc -> acc * val end)
-    IO.puts "QUI HO: "<>inspect([expected_size, raw, vals])
     if Enum.count(vals) != expected_size, do:
       raise ArgumentError, "Number of values does not match tensor's size. Expected #{expected_size}, but it is #{Enum.count(vals)}. "
 
     tensor = %Placeholder{
-      data_type: data_type_atom,
+      data_type: data_type_id,
       name: name,
       # raw_data: (raw && vals) || "",
       # float_data: (!raw && vals) || [],
@@ -83,7 +94,7 @@ defmodule DarknetToOnnx.Helper do
     }
     
     # TODO @stefkohub add support for complex values
-    if raw == True do
+    if raw == true do
       %{ tensor | raw_data: vals }
     else
       tvalue = cond do
@@ -109,7 +120,8 @@ defmodule DarknetToOnnx.Helper do
     Create a ValueInfoProto structure with internal TypeProto structures
   """
   def make_tensor_value_info(name, elem_type, shape, doc_string \\ "", shape_denotation \\ "") do
-    the_type = make_tensor_type_proto(elem_type, shape, shape_denotation)
+    {elem_type_id, _elem_type_atom} = parse_data_type(elem_type)
+    the_type = make_tensor_type_proto(elem_type_id, shape, shape_denotation)
 
     %Value{
       name: name,
@@ -129,8 +141,8 @@ defmodule DarknetToOnnx.Helper do
            elem_type: elem_type,
            shape:
              if shape != nil do
-               if is_enum?(shape_denotation) == True and Enum.count(shape_denotation) != 0 and
-                    Enum.count(shape_denotation) != Enum.count(shape) do
+               if is_enum?(shape_denotation) == true and Enum.count(shape_denotation) != 0 and
+                    Enum.count(shape_denotation) != tuple_size(shape) do
                  raise "Invalid shape_denotation. Must be the same length as shape."
                end
                %Shape{dim: create_dimensions(shape, shape_denotation)}
@@ -141,9 +153,7 @@ defmodule DarknetToOnnx.Helper do
     }
   end
 
-  @doc """
-    Create a TensorShapeProto.Dimension structure based on shape types
-  """
+  # Create a TensorShapeProto.Dimension structure based on shape types
   defp create_dimensions(shape, shape_denotation) do
     list_shape = (is_tuple(shape) && Tuple.to_list(shape)) || shape
 
