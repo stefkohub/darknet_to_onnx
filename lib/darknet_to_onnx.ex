@@ -68,6 +68,9 @@ defmodule DarknetToOnnx do
         True
       )
 
+    IO.puts("Optimizing ONNX graph removing initializers from input")
+    model = Helper.remove_initializer_from_input(model)
+
     Helper.save_model(model, output_path)
     IO.puts("Done.")
     model

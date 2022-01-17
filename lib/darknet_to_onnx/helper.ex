@@ -50,19 +50,20 @@ defmodule DarknetToOnnx.Helper do
   end
 
   defp parse_data_type(data_type) do
-    max_data_type_id = Enum.count(Placeholder.DataType.constants) - 1
     parsed_data_type = cond do
       is_atom(data_type) -> 
         # Check for an existing type identified by the atom
         data_type_id_from_atom(data_type)
-      is_number(data_type) && data_type < max_data_type_id -> 
+      is_number(data_type) -> 
         # Check for an existing type identified by the number
         Enum.fetch!(Placeholder.DataType.constants, data_type)
       true ->
         nil
     end
-    if parsed_data_type == nil, do:
+    if parsed_data_type == nil or parsed_data_type == :error do
+      max_data_type_id = Enum.count(Placeholder.DataType.constants)-1
       raise ArgumentError, "Wrong data_type format. Expected atom or number<#{max_data_type_id}, got: #{data_type}"
+    end
     parsed_data_type
   end
 
@@ -367,4 +368,11 @@ defmodule DarknetToOnnx.Helper do
       attribute: make_attribute(kwargs)
     }
   end
+
+  def remove_initializer_from_input(%Model{graph: graph} = model) do
+    %{model | graph: %Graph{graph | input: Enum.reject(model.graph.input, fn input ->
+      Enum.find(model.graph.initializer, fn init -> input.name === init.name end)
+    end)}}
+  end
+
 end

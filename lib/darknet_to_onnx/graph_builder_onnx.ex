@@ -483,7 +483,7 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
         | nodes:
             Utils.cfl(
               state.nodes,
-              Helper.make_node("Upsample", inputs, [layer_name], layer_name, %{mode: "nearest"})
+              Helper.make_node("Resize", inputs, [layer_name], layer_name, %{mode: "nearest"})
             ),
           param_dict: Utils.cfl(state.param_dict, %{layer_name => upsample_params})
       },
@@ -576,7 +576,6 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
 
       case layer_type do
         "convolutional" ->
-          #  [initializer_layer, inputs_layer] = DarknetToOnnx.WeightLoader.load_conv_weights(params)
           DarknetToOnnx.WeightLoader.load_conv_weights(params)
 
         "upsample" ->

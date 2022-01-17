@@ -104,7 +104,7 @@ defmodule DarknetToOnnx.WeightLoader do
     initializer_tensor =
       DarknetToOnnx.Helper.make_tensor(
         param_name,
-        1,
+        :FLOAT,
         param_data_shape,
         param_data
       )
@@ -112,7 +112,7 @@ defmodule DarknetToOnnx.WeightLoader do
     input_tensor =
       Helper.make_tensor_value_info(
         param_name,
-        1,
+        :FLOAT,
         param_data_shape
       )
 
