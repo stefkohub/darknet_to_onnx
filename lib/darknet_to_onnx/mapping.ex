@@ -1,27 +1,27 @@
 defmodule DarknetToOnnx.Mapping do
   @moduledoc """
-    Helper class used for mapping different data types
+    Helper module used for mapping different data types
     (partially ported from: https://github.com/onnx/onnx/blob/master/onnx/helper.py)
   """
 
-  @my_tensor_type_to_nx_type [
+  @my_tensor_type_to_nx_size [
     {:UNDEFINED, :UNDEFINED},
     {:FLOAT, 4},
     {:UINT8, 1},
-    {:INT8, 1}, 
+    {:INT8, 1},
     {:UINT16, 2},
     {:INT16, 2},
     {:INT32, 4},
     {:INT64, 8},
     {:STRING, :STRING},
     {:BOOL, :BOOL},
-    {:FLOAT16, 2}, # {:f, 16}},
-    {:DOUBLE, 8}, # {:f, 64}},
-    {:UINT32, 4},# {:u, 32}},
-    {:UINT64, 8}, #{:u, 64}},
+    {:FLOAT16, 2},
+    {:DOUBLE, 8},
+    {:UINT32, 4},
+    {:UINT64, 8},
     {:COMPLEX64, :COMPLEX64},
     {:COMPLEX128, :COMPLEX128},
-    {:BFLOAT16, 2}, # {:bf}}
+    {:BFLOAT16, 2}
   ]
 
   @my_tensor_type_atom_to_storage_type [
@@ -60,6 +60,5 @@ defmodule DarknetToOnnx.Mapping do
 
   def tensor_type_atom_to_storage_type, do: @my_tensor_type_atom_to_storage_type
   def storage_tensor_type_to_field, do: @my_storage_tensor_type_to_field
-  def tensor_type_to_nx_type, do: @my_tensor_type_to_nx_type
-
+  def tensor_type_to_nx_size, do: @my_tensor_type_to_nx_size
 end

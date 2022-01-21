@@ -90,9 +90,9 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
       :channels => channels,
       :created_onnx_node =>
         if name != nil and is_integer(channels) and channels > 0 do
-          True
+          true
         else
-          False
+          false
         end
     }
   end
@@ -121,7 +121,7 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
   end
 
   defp make_conv_node_batch_normalize(state, inputs, conv_params_state, layer_name_output)
-       when conv_params_state.batch_normalize == True do
+       when conv_params_state.batch_normalize == true do
     inputs =
       Utils.cfl(
         inputs,
@@ -186,9 +186,9 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
         node_name: layer_name,
         batch_normalize:
           if layer_dict["batch_normalize"] != nil and layer_dict["batch_normalize"] > 0 do
-            True
+            true
           else
-            False
+            false
           end,
         conv_weight_dims: weights_shape
       )
@@ -198,7 +198,7 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
     weights_name = DarknetToOnnx.ConvParams.generate_param_name(conv_params_state, "conv", "weights")
 
     inputs =
-      if conv_params_state.batch_normalize != True do
+      if conv_params_state.batch_normalize != true do
         Utils.cfl([], [
           previous_node_specs.name,
           weights_name,
@@ -221,7 +221,7 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
     inputs = [layer_name]
 
     [state, layer_name_output, inputs] =
-      if conv_params_state.batch_normalize == True do
+      if conv_params_state.batch_normalize == true do
         new_nodes = make_conv_node_batch_normalize(state, inputs, conv_params_state, layer_name)
 
         [
@@ -377,7 +377,7 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
                   "Split",
                   [route_node_specs.name],
                   for nn <- 0..(groups - 1) do
-                    nn == group_id && layer_name || layer_name <> "_dummy#{nn}"
+                    nn == group_id && layer_name || "#{layer_name}_dummy#{nn}"
                   end,
                   layer_name,
                   %{
@@ -483,7 +483,7 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
         | nodes:
             Utils.cfl(
               state.nodes,
-              Helper.make_node("Resize", inputs, [layer_name], layer_name, %{mode: "nearest"})
+              Helper.make_node("Upsample", inputs, [layer_name], layer_name, %{mode: "nearest"})
             ),
           param_dict: Utils.cfl(state.param_dict, %{layer_name => upsample_params})
       },
@@ -566,9 +566,9 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
         Keyword arguments:
         layer_configs -- an OrderedDict object with all parsed layers' configurations
         weights_file_path -- location of the weights file
-        verbose -- toggles if the graph is printed after creation (default: True)
+        verbose -- toggles if the graph is printed after creation (default: true)
   """
-  def make_initializer_inputs(state) do
+  def make_initializer_inputs(state, force_raw \\ false) do
     Enum.map(state.param_dict, fn data ->
       [layer_name] = Map.keys(data)
       [_, layer_type] = String.split(layer_name, "_")
@@ -576,7 +576,7 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
 
       case layer_type do
         "convolutional" ->
-          DarknetToOnnx.WeightLoader.load_conv_weights(params)
+          DarknetToOnnx.WeightLoader.load_conv_weights(params, force_raw)
 
         "upsample" ->
           DarknetToOnnx.WeightLoader.load_upsample_scales(params)
@@ -603,7 +603,7 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
     end)
   end
 
-  def build_onnx_graph(state, layer_configs, layer_configs_keys, weights_file_path, verbose \\ True) do
+  def build_onnx_graph(state, layer_configs, layer_configs_keys, weights_file_path, verbose \\ true, force_raw \\ false) do
     {state, major_node_specs} = create_major_node_specs(state, layer_configs, layer_configs_keys)
 
     state = %{
@@ -618,7 +618,7 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
 
     [state, outputs]
     DarknetToOnnx.WeightLoader.start_link(weights_file: weights_file_path)
-    [initializer, inputs] = make_initializer_inputs(state)
+    [initializer, inputs] = make_initializer_inputs(state, force_raw)
     DarknetToOnnx.WeightLoader.stop_link()
 
     state = %{
@@ -633,7 +633,7 @@ defmodule DarknetToOnnx.GraphBuilderONNX do
           )
     }
 
-    if verbose == True do
+    if verbose == true do
       Helper.printable_graph(state.graph_def)
     end
 

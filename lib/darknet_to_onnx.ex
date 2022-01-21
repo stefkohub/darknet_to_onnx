@@ -14,7 +14,7 @@ defmodule DarknetToOnnx do
   alias DarknetToOnnx.ParseDarknet
   alias DarknetToOnnx.GraphBuilderONNX
 
-  def darknet_to_onnx(model, cfg_file_path, weights_file_path, output_path) do
+  def darknet_to_onnx(model, cfg_file_path, weights_file_path, output_path, force_raw \\ false) do
     {result, parser_pid} = ParseDarknet.start_link(cfg_file_path: cfg_file_path)
 
     if result != :ok do
@@ -65,7 +65,8 @@ defmodule DarknetToOnnx do
         layer_configs,
         layer_configs_keys,
         weights_file_path,
-        True
+        true,
+        force_raw
       )
 
     IO.puts("Optimizing ONNX graph removing initializers from input")

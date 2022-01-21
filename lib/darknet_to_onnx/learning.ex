@@ -38,9 +38,9 @@ defmodule DarknetToOnnx.Learning do
     if is_list(var) or
          (is_map(var) and not Map.has_key?(var, :__struct__)) or
          is_tuple(var) do
-      True
+      true
     else
-      False
+      false
     end
   end
 end
